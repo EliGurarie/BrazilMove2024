@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Univeridade Federal de Mato Grosso do Sul - UFMS" />
+
+
+<title>Animal Movement Analysis Short Course</title>
+
+<script src="index_files/header-attrs-2.25/header-attrs.js"></script>
+<script src="index_files/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="index_files/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="index_files/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="index_files/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="index_files/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="index_files/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="index_files/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="index_files/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="index_files/navigation-1.1/tabsets.js"></script>
+<link href="index_files/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="index_files/highlightjs-9.12.0/highlight.js"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Animal Movement Analysis Short Course</h1>
+<h3 class="subtitle">III BrazilMove 2024</h3>
+<h4 class="author">Univeridade Federal de Mato Grosso do Sul - UFMS</h4>
+<h4 class="date">May 20-24, 2024</h4>
+
+</div>
+
+
+<center>
+<p><img src="images/logo_ecomov_sem_fundo.webp" /> <img
+src="images/CAPES%20print%20logo_editado.webp" /> <img
+src="images/logo-original-fundo-claro.webp" /> <img
+src="images/SUNY_ESF_logo.png" /></p>
+<p><strong><a href="mailto:egurarie@esf.edu">Dr. Eliezer (Elie)
+Gurarie</a> | <a href="mailto:barbour@esf.edu">Dr. Nicole (Nicki)
+Barbour</a></strong></p>
+<p>Department of Environmental Biology <br> State University of New
+York, College of Environmental Science and Forestry (SUNY-ESF) <br>
+Syracuse, NY 13210, USA</p>
+<p><em>With able assistance of:</em><br> <strong>Dr. Luiz Gustavo
+Rodrigues Oliveira-Santos</strong> (UFMGS) and <strong>Dr. James
+Forester</strong> (University of Minnesota)</p>
+</center>
+<div id="goals" class="section level2">
+<h2>Goals</h2>
+<p>This workshop is dedicated to developing skills in animal movement
+analysis, with an aim to start with foundations and build to useful and
+original inference. We will learn about the properties of movement data,
+how to load, explore, visualize, and manipulate movement data. We will
+learn the properties and parameters of some fundamental discrete and
+continuous time movement models, and how to estimate those models. We
+will cover tools for segmentation, behavioral analisys, and home
+ranging. We will relate movements to spatial data and environmental
+covariates.</p>
+<p>This is a <strong>hands-on</strong> course, where every day students
+will be expected to perform independent or group work on original
+problems, culminating in a final presentation of the progress made.</p>
+</div>
+<div id="what-to-bring" class="section level2">
+<h2>What to bring</h2>
+<p><strong>Bring data</strong> if you have some! And some
+<strong>interesting ecological or behavioral questions</strong> you are
+interested in exploring.</p>
+<p>If you don’t have data that feels relevant, you can work with other
+participants on an in-class project.</p>
+<p>We will be using <a href="https://cran.r-project.org/">R</a>, which
+we assume <em>participants have experience using</em>. Be sure
+<strong>R</strong> is installed, as well as (most likely) <a
+href="https://posit.co/download/rstudio-desktop/">Rstudio</a>,
+preferably recent versions.</p>
+<p>We’ll also use a bunch of useful packages which we can install and
+load as needed.</p>
+<p>Bring enthusiasm!</p>
+</div>
+<div id="structure" class="section level2">
+<h2>Structure</h2>
+<p>The course will mix lectures on concepts, theory and tools with
+practical labs using R. We will plan on covering 2 topics per day
+(morning and afternoon), with a lecture and an R lab each. We will also
+set aside time every day for participants to apply some of the
+techniques to their own data (alone or in groups) in a workshop-type
+atmosphere. We will culminate with some brief presentations of some of
+the analysis performed by individuals / groups.</p>
+<p>The outline of the course below is approximate. We’ll be posting
+links to materials (lecture and labs) as the course proceeds.</p>
+</div>
+<div id="outline-schedule-tentative" class="section level2">
+<h2>Outline / Schedule (tentative!)</h2>
+<div id="day-1-monday-may-20" class="section level3">
+<h3>Day 1: Monday, May 20</h3>
+<div id="morning-introductions-overview" class="section level4">
+<h4>Morning: <strong>Introductions / Overview</strong></h4>
+<p><font color = "darkred"> <strong>Present:</strong> <em>about
+yourself</em></p>
+<p>Please come prepared with 2-3 slides to introduce yourself, your
+study system, your ecological questions, and a brief description of your
+data. </font></p>
+</div>
+<div id="afternoon-summarizing-and-visualizing" class="section level4">
+<h4>Afternoon: Summarizing and Visualizing</h4>
+<ul>
+<li>Managing data in R,</li>
+<li>Using complex numbers</li>
+<li>Different ways to plot</li>
+</ul>
+<p><font color = "darkred"> <strong>Exercise:</strong> <em>summarize and
+plot your data</em> </font></p>
+</div>
+</div>
+<div id="day-2-tuesday-may-21" class="section level3">
+<h3>Day 2: Tuesday, May 21</h3>
+<div id="morning-movement-models" class="section level4">
+<h4>Morning: <strong>Movement Models</strong></h4>
+<p><font color = "darkred"> <strong>Present:</strong> <em>results from
+the previous day</em> </font></p>
+<ul>
+<li>Correlated random walk, discrete time, continuous time movement
+models</li>
+<li>Summary statistics and parameters</li>
+</ul>
+</div>
+<div id="afternoon-segmentation" class="section level4">
+<h4>Afternoon: <strong>Segmentation</strong></h4>
+<ul>
+<li>First Passage Time</li>
+<li>Lavielle segmentation</li>
+<li>Behavioral change point analysis</li>
+<li>Hidden Markov models</li>
+</ul>
+<p><font color = "darkred"> <strong>Exercise:</strong> <em>Apply a
+movement model or segmentation method to your data.</em> </font></p>
+</div>
+</div>
+<div id="day-3-wednesday-may-22" class="section level3">
+<h3>Day 3: Wednesday, May 22</h3>
+<div id="morning-home-range-analyses" class="section level4">
+<h4>Morning: <strong>Home Range Analyses</strong></h4>
+<p><font color = "darkred"> <strong>Present:</strong> <em>results from
+the previous day</em> </font></p>
+<ul>
+<li>Mininum convex polygon</li>
+<li>Kernel density estimates</li>
+<li>Auto-correlated kernel density estimates</li>
+</ul>
+</div>
+<div id="afternoon-environmental-data" class="section level4">
+<h4>Afternoon: <strong>Environmental Data</strong></h4>
+<ul>
+<li>Spatial data and annotations</li>
+<li>Summaries of Use and Availability</li>
+</ul>
+<p><font color = "darkred"> <strong>Exercise:</strong> <em>Estimate a
+home range and/or characterize environmental space use of your
+organism,</em> </font></p>
+</div>
+</div>
+<div id="day-4-thursday-may-23" class="section level3">
+<h3>Day 4: Thursday, May 23</h3>
+<div id="morning-resource-selection" class="section level4">
+<h4>Morning: <strong>Resource Selection</strong></h4>
+<p><font color = "darkred"> <strong>Present:</strong> results from the
+previous day </font></p>
+<ul>
+<li>resource selection functions</li>
+<li>step-selection functions</li>
+</ul>
+</div>
+<div id="afternoon-open-work-session" class="section level4">
+<h4>Afternoon: <strong>Open Work Session</strong></h4>
+</div>
+</div>
+<div id="day-5-friday-may-24" class="section level3">
+<h3>Day 5: Friday, May 24</h3>
+<div id="morning-special-topics" class="section level4">
+<h4>Morning: Special Topics</h4>
+<p>By Gustavo and/or James and/or Nicki and/or Elie on selected topics
+of particular interest to students</p>
+</div>
+<div id="afternoon-final-presentations" class="section level4">
+<h4>Afternoon: <strong>Final Presentations</strong></h4>
+<p><font color = "darkred"></p>
+<p>Please come prepared to present (~10 min) on a small analysis of your
+data (Include 1-2 slides each introducing your study system and research
+question(s), describing your methods and analyses, your results, and the
+implications/discussion of your findings</p>
+<p></font></p>
+<center>
+<img src="https://eligurarie.github.io/MovementEcologyBook/images/Muybridge_Buffalo_galloping.gif" width ="300">
+</center>
+</div>
+</div>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
