@@ -1,0 +1,37 @@
+---
+title: 'L4: Home Range Analyses'
+author: "Nicole Barbour"
+date: "2024-05-15"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
+
+```
+
+# Load Data In
+
+```{r}
+load("./data/elk_processed.rda")
+```
+
+# Subset for Time Range of Interest
+
+
+
+# MCP
+
+
+
+# KDE
+
+
+
+# AKDE
+
