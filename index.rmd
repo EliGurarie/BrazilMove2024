@@ -56,9 +56,10 @@ Bring enthusiasm!
 
 ## Structure
 
-The course will mix lectures on concepts, theory and tools with practical labs using R. We will plan on covering 2 topics per day (morning and afternoon), with a lecture and an R lab each.  We will also set aside time every day for participants to apply some of the techniques to their own data (alone or in groups) in a workshop-type atmosphere.  We will culminate with some brief presentations of some of the analysis performed by individuals / groups.  
+The course will mix lectures on concepts, theory and tools with practical labs using R. We will plan on covering roughly 2 topics per day in a morning (**8:00-11:30 am**) and afternoon (**1:30-5:00 pm**) session, with a mix of lecture and R labs for each.  We will also set aside time every day for participants to apply some of the techniques to their own data (alone or in groups) in a workshop-type atmosphere.  We will culminate with some brief presentations of some of the analysis performed by individuals / groups.  
 
 The outline of the course below is approximate.  We'll be posting links to materials (lecture and labs) as the course proceeds.  
+
 
 ## Outline / Schedule (tentative!)
 
