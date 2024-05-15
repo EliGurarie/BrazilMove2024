@@ -31,7 +31,7 @@ save(elk_gps, file="./data/elk_gps.rda")
 # Mountain tapir, Colombia (N=3)
 # The Nature Conservancy Colombia
 
-tapir <- read.csv("./data/Mountaintapir_Colombia.csv")
+tapir <- read.csv("./data/MountainTapirColombia.csv")
 
 # save
 save(tapir, file="./data/tapir.rda")

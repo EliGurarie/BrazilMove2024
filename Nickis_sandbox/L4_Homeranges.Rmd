@@ -21,17 +21,148 @@ knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
 load("./data/elk_processed.rda")
 ```
 
-# Subset for Time Range of Interest
+# Subset for 3 "Residential" Individuals
 
+2004
+
+```{r}
+library(dplyr)
+```
+
+
+```{r}
+elk_res <- elk_processed |>
+  filter(id %in% c("YL80", "YL91", "YL94"))
+```
+
+# Visualize Tracks
+
+```{r}
+library(ggplot2)
+```
+
+
+```{r fig.height=10, fig.width=5}
+ggplot(data=elk_res, aes(x=lon, y=lat)) +
+  geom_path(size=0.5, color="darkgrey") +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol=1)
+```
+
+# Make Data Spatial 
+
+```{r}
+library(sf)
+```
+
+
+```{r}
+elk_res_sf <- elk_res |> 
+  st_as_sf(coords = c("lon","lat"), crs=4326) |>
+  st_transform(32611)
+```
+
+# Make an Interactive Map of Tracks
+
+```{r}
+library(mapview)
+```
+
+```{r}
+elk_tracks <- elk_res_sf |> 
+  group_by(id) |> 
+  summarize(do_union=FALSE) |> 
+  st_cast("LINESTRING")
+
+mapview(elk_tracks,zcol="id")
+```
+
+# Convert Data to a List
+
+```{r}
+elk_id <- split(elk_res_sf, elk_res_sf$id)
+```
 
 
 # MCP
 
+```{r}
+library(sp)
+
+library(adehabitatHR)
+```
+
+the 100 means that we are using all points (100%) to determine the MCP
+
+```{r}
+findMCP <- function(id_sf, percent){
+  
+  id_sp <- id_sf |> st_cast("POINT") %>% as_Spatial()
+  
+  id_mcp<-mcp(id_sp, percent, unout="km2")
+  
+  return(id_mcp)
+}
+```
+
+```{r}
+elk_mcp <- lapply(elk_id,
+                  findMCP,
+                  percent=95)
+```
+
+```{r}
+elk_mcp["YL80"]
+```
+
+
+```{r}
+mapview(elk_mcp["YL80"], col.regions="red", map.types="Esri.WorldImagery")+
+  mapview(elk_mcp["YL91"], col.regions="orange")+
+  mapview(elk_mcp["YL94"], col.regions="blue")
+```
 
 
 # KDE
 
+```{r}
+findKDE <- function(id_sf, grid, percent){
+  
+  id_sp <- id_sf |> st_cast("POINT") %>% as_Spatial()
+  
+  id_kernelud <- kernelUD(id_sp, grid = grid)
+  
+  
+  id_homerangecontour <- getverticeshr(id_kernelud, percent)
+    
+  id_poly <- st_as_sf(id_homerangecontour)
+  
+  id_poly$area <- st_area(id_poly)
+  
+  return(id_poly)
+}
+```
 
+```{r}
+elk_kde <- lapply(elk_id,
+  findKDE,
+  grid = 200,
+  percent =95
+)
+```
+
+```{r}
+elk_kde["YL80"]
+```
+
+
+```{r}
+mapview(elk_kde["YL80"], col.regions="red", map.types="Esri.WorldImagery")+
+  mapview(elk_kde["YL91"], col.regions="orange")+
+  mapview(elk_kde["YL94"], col.regions="blue")
+```
 
 # AKDE
+
+
 
