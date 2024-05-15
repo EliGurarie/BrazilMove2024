@@ -1,0 +1,323 @@
+---
+title: 'L1: Data Visualization & Summary, Complex Numbers'
+author: "Nicole Barbour"
+date: "2024-05-15"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
+
+
+```
+
+# Data Description
+
+GPS tracking data for elk (N=31) from Hebblewhite et al 2008 (https://doi.org/10.1890/06-1708.1).
+
+# Data Summaries
+
+## Load Data In, Check Structure
+
+
+```{r}
+load("./data/elk_gps.rda")
+
+```
+
+```{r}
+str(elk_gps)
+```
+
+## Make DateTime Posixct Format
+
+```{r}
+elk_gps$timestamp <- as.POSIXct(elk_gps$timestamp, format="%m/%d/%Y %H:%M:%S")
+
+```
+
+## Check For Missing Data
+
+```{r}
+elk_gps2 <- subset(elk_gps, is.na(timestamp)==FALSE & is.na(location.long)==FALSE & is.na(location.lat)==FALSE)
+
+```
+
+
+## Create Data Summary Table
+
+```{r}
+library(plyr)
+library(dplyr)
+```
+
+
+```{r}
+elk_gps2 |> group_by(individual.local.identifier) |> 
+  summarize(Min_Time = min(timestamp),
+            Max_Time = max(timestamp),
+            Duration = round(difftime(max(timestamp), min(timestamp), units = "days")))
+```
+
+```{r}
+elk_gps2 |> group_by(individual.local.identifier) |>
+  summarize(time_range = as.numeric(difftime(max(timestamp), min(timestamp), units ="days"))) |> 
+  summary()
+```
+
+# Visualize Tracking Durations
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+ggplot(data=elk_gps2,aes(x=timestamp,y=individual.local.identifier,color=individual.local.identifier))+ 
+  geom_path(linewidth=1) +
+  theme_classic() + 
+  xlab("Time") + ylab("ID")+ 
+  theme(legend.position = "none")
+```
+
+# Drop Individuals With Short Tracks
+
+```{r}
+elk_gps3 <- subset(elk_gps2, !individual.local.identifier %in% c("GP1", "YL72", "YL79"))
+
+```
+
+```{r}
+elk_gps3 |> group_by(individual.local.identifier) |>
+  summarize(time_range = as.numeric(difftime(max(timestamp), min(timestamp), units ="days"))) |> 
+  summary()
+```
+
+
+```{r}
+ggplot(data=elk_gps3,aes(x=timestamp,y=individual.local.identifier,color=individual.local.identifier))+ 
+  geom_path(linewidth=1) +
+  theme_classic() + 
+  xlab("Time") + ylab("ID")+ 
+  theme(legend.position = "none")
+```
+
+
+
+# Examine the Fix Rate
+
+```{r}
+dtime <- function(t, ...) {difftime(t[-1], t[-length(t)], ...) %>% as.numeric}
+
+fix_rate <- elk_gps3 |> 
+  group_by(individual.local.identifier) |>
+  arrange(timestamp) |>
+  mutate(dtime = c(0,round(dtime(timestamp, units ="hours")))) |>
+  data.frame() |>
+  ungroup()
+```
+
+```{r}
+barplot(table(fix_rate$dtime))
+```
+
+```{r}
+summary(fix_rate$dtime)
+```
+# Change Column Names
+
+```{r}
+colnames(elk_gps3) <- c("datetime", "lon", "lat", "mig.stage", "sensor.type", "id")
+```
+
+
+# Visualize Tracks
+
+```{r fig.height=15, fig.width=7}
+ggplot(data=elk_gps3, aes(x=lon, y=lat)) +
+  geom_path(size=0.5, color="darkgrey") +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol=3)
+```
+
+```{r fig.height=15, fig.width=9}
+ggplot(data=elk_gps3, aes(x=datetime, y=lat)) +
+  geom_path(size=0.5, color="darkgrey") +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol=3)
+```
+
+
+# Make Data Spatial
+
+```{r}
+library(sf)
+```
+
+```{r}
+elk_sf <- elk_gps3 |>
+  st_as_sf(coords = c("lon","lat"), crs=4326)
+```
+
+```{r}
+st_geometry(elk_sf)
+```
+
+
+
+
+# Interactive Maps of Tracks
+
+```{r}
+library(mapview)
+```
+
+```{r}
+elk_tracks <- elk_sf |> 
+  group_by(id) |> 
+  summarize(do_union=FALSE) |> 
+  st_cast("LINESTRING")
+```
+
+```{r}
+mapview(elk_tracks, zcol="id")
+```
+
+
+# Convert to Projected Coordinate System
+
+Data is in UTM Zone 11 North (EPSG Code: 32611)
+
+```{r}
+elk_utm <- elk_sf |>
+  st_transform(32611)
+```
+
+# Extract Coordinates and Add to Dataframe
+
+```{r}
+latlon_coords <- st_coordinates(elk_sf)
+
+xy_coords <- st_coordinates(elk_utm)
+```
+
+```{r}
+elk_df <- elk_utm |> data.frame() |>
+  select(-geometry)
+```
+
+```{r}
+elk_df$lon <- latlon_coords[,1]
+elk_df$lat <- latlon_coords[,2]
+
+elk_df$X <- xy_coords[,1]
+elk_df$Y <- xy_coords[,2]
+```
+
+# Remove Duplicate Timestamps & Sort by Time
+
+```{r}
+elk_df2 <- elk_df |>
+  group_by(id) |>
+  filter(!duplicated(datetime)) |>
+  arrange(datetime) |>
+  ungroup() |>
+  data.frame()
+```
+
+
+# Convert Locations into Complex Numbers
+
+```{r}
+elk_df2$Z <- complex(re = elk_df2$X, im = elk_df2$Y)
+
+# or
+
+elk_df2$Z <- elk_df2$X + 1i*elk_df2$Y
+
+```
+
+
+# Generate Movement Metrics
+
+```{r}
+
+getMovementMetrics <- function(dataframe){
+  
+  move_step <- diff(dataframe$Z)  
+
+  time_step <- as.numeric(difftime(dataframe$datetime[-1], dataframe$datetime[-length(dataframe$datetime)], "days"))
+
+  absolute_turnangle <- Arg(move_step)
+
+  relative_turnangle <- diff(absolute_turnangle)
+
+  step_length_km <- Mod(move_step)/1000
+  
+  dataframe$time_step_days <- c(NA, time_step)
+
+  dataframe$move_rate_km_day <- c(NA, step_length_km/time_step)
+
+  dataframe$step_length_km <- c(NA, step_length_km)
+
+  dataframe$relative_turnangle <- c(NA, NA, relative_turnangle)
+  
+  return(dataframe)
+}
+  
+```
+
+```{r}
+elk_df3 <- elk_df2 |> 
+  ddply("id", getMovementMetrics)
+```
+
+
+
+# Visualize and Summarize Movement Metrics
+
+```{r}
+summary(elk_df3$step_length_km)
+```
+```{r}
+elk_df3 |>
+  group_by(id) |>
+  filter(is.na(move_rate_km_day)==FALSE) |>
+  summarize(Min_MoveRate = min(move_rate_km_day),
+            Max_MoveRate = max(move_rate_km_day),
+            Avg_MoveRate = mean(move_rate_km_day))
+```
+
+```{r}
+steplengths <- na.omit(elk_df3$step_length_km)
+
+hist(steplengths, col="grey", bor="black", freq=FALSE, breaks=50)
+lines(density(steplengths), col=2, lwd=2)
+```
+
+```{r}
+library(circular)
+```
+
+
+```{r, message=FALSE}
+turningangles <- as.circular(na.omit(elk_df3$relative_turnangle))
+
+rose.diag(turningangles, bins=20, col="grey", prop=2)
+```
+
+
+
+
+# Save Your Processed Data
+
+```{r, eval=FALSE}
+elk_processed <- elk_df3
+
+save(elk_processed, file="./data/elk_processed.rda")
+```
+
