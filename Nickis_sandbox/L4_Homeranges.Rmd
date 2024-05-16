@@ -164,5 +164,200 @@ mapview(elk_kde["YL80"], col.regions="red", map.types="Esri.WorldImagery")+
 
 # AKDE
 
+```{r}
+library(ctmm)
+```
+
+## Convert Data to CTMM Format
+
+```{r}
+
+elk_res2 <-  elk_res |> dplyr::select(id, datetime, lat, lon)
+
+names(elk_res2) <- c("individual.local.identifier","timestamp","location.lat","location.long")
+
+elk_ctmm <- as.telemetry(elk_res2)
+
+summary(elk_ctmm)
+```
+
+## Fit CTMM Models to Data
+
+```{r}
+library(future.apply)
+```
+
+```{r eval=FALSE}
+fitCTMM <- function(ctmm_object){
+  
+  guess <- ctmm.guess(ctmm_object, interactive=FALSE)
+  
+  ctmm_fit <- ctmm.select(ctmm_object, guess, method="pHREML", cores=0)
+  
+  return(ctmm_fit)
+}
+```
+
+```{r eval=FALSE}
+elk_ctmm_fit <- lapply(elk_ctmm,
+  fitCTMM
+)
+```
+
+```{r eval=FALSE}
+plan(multisession)
+
+elk_ctmm_fit <- future_lapply(elk_ctmm,
+                             FUN = fitCTMM)
+
+plan(sequential)
+```
+
+
+```{r eval=FALSE}
+elk_ctmm_predict <- c()
+
+for(i in c(1:length(elk_ctmm_fit))){
+  
+  elk_ctmm_predict[[i]] <- summary(elk_ctmm_fit[[i]])$name
+  
+}
+
+```
+
+
+
+```{r include=FALSE}
+#save(elk_ctmm_predict, elk_ctmm_fit, file="./data/ctmm_elk.rda")
+
+load(file="./data/ctmm_elk.rda")
+```
+
+## Plot SemiVariograms
+
+```{r}
+for (i in 1:length(elk_ctmm)){
+  
+  SVF <- variogram(elk_ctmm[[i]])
+  
+  plot(SVF, CTMM = elk_ctmm_fit[[i]])
+  
+  title(paste("Track ID:", names(elk_ctmm)[i]))
+}
+```
+
+## Calculate AKDEc Homeranges
+
+```{r}
+
+elk_homerange<-c()
+
+for (i in c(1:length(elk_ctmm_predict))){
+  
+  elk_homerange[[i]] <- akde(elk_ctmm[[i]], elk_ctmm_fit[[i]])
+  
+}
+```
+
+## Visualize AKDEc Homeranges
+
+```{r}
+for (i in c(1:length(elk_ctmm))){
+  
+  plot(elk_ctmm[[i]], UD = elk_homerange[[i]])
+  
+  title(paste(names(elk_ctmm)[i],"pHREML AKDEc"))
+}
+
+```
+
+```{r}
+
+elk_homerange_poly <- lapply(elk_homerange,
+                             SpatialPolygonsDataFrame.UD)
+
+names(elk_homerange_poly) <- names(elk_ctmm)
+
+```
+
+```{r}
+mapview(elk_homerange_poly, map.types="Esri.WorldImagery", legend=FALSE, cex=2, lwd=0.1)
+```
+
+## Create "Fancy" DataTable with Estimates
+
+```{r}
+library(formattable)
+```
+
+
+```{r}
+area<-c()
+eff_n<-c()
+abs_n<-c()
+bias<-c()
+
+for (i in c(1:length(elk_ctmm_predict))){
+  area[[i]]<-summary(elk_homerange[[i]])$CI[2]
+  eff_n[[i]]<-summary(elk_homerange[[i]])$DOF[1]
+  abs_n[[i]]<-nrow(elk_ctmm[[i]])
+  bias[[i]]<-1/summary(elk_homerange[[i]])$DOF['area']^2
+}
+
+area2<- do.call("rbind",area)
+eff_n2<- do.call("rbind",eff_n)
+abs_n2<- do.call("rbind",abs_n)
+bias2<- do.call("rbind",bias)
+predict<- do.call("rbind",elk_ctmm_predict)
+
+data_table <- data.frame(ID = names(elk_ctmm))
+
+data_table$area <- area2[,1]
+data_table$eff_n <- eff_n2[,1]
+data_table$abs_n <- abs_n2[,1]
+data_table$ctmm_model <- predict[,1]
+data_table$bias <- bias2[,1]*100
+
+data_table[,c(2:3,6)] <- signif(data_table[,c(2:3,6)], digits=2)
+
+data_table$bias <- sub("0+$","",data_table$bias)
+
+data_table$bias <- format(data_table$bias,scientific=FALSE)
+
+
+colnames(data_table)[1]<-"ID Name"
+colnames(data_table)[2]<-"Estimated Home Range Area (square km)"
+colnames(data_table)[3]<-"Effective Sample Size"
+colnames(data_table)[4]<-"Absolute Sample Size (No. of Obs)"
+colnames(data_table)[5]<-"Fitted CTMM Model"
+colnames(data_table)[6]<-"Expected Order of Bias (%)"
+
+formattable(data_table, align = c("l", rep("r", NCOL(data_table) - 1)))
+```
+
+
+## Find Population/Group-Level Homerange
+
+```{r results='hide'}
+elk_akdes_all <- akde(elk_ctmm, elk_ctmm_fit, trace=1)
+```
+
+
+
+```{r}
+col <- color(elk_akdes_all, by = 'individual')
+
+plot(elk_akdes_all, col.DF = col, col.level = col,col.grid = NA, level=NA)
+```
+
+```{r}
+meta(elk_akdes_all, col = c(col,'black'), sort=TRUE)
+```
+
+
+
+
+
+
 
 

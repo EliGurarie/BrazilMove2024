@@ -1,0 +1,60 @@
+---
+title: 'L5: Resource Selection Functions, Step Selection Functions'
+author: "Nicole Barbour"
+date: "2024-05-16"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load in Data
+
+```{r}
+
+```
+
+
+# Resource Selection Function
+
+```{r}
+
+```
+
+
+## Visualize Covariates
+
+```{r}
+
+```
+
+
+## Determine Available Space
+
+```{r}
+
+```
+
+
+## Extract Resource (Raster) Layers to Points
+
+```{r}
+
+```
+
+
+## Fit RSF 
+
+### Binomial GAM
+
+```{r}
+
+```
+
+### Binomial GAMM
+
+
