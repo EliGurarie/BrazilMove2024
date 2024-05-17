@@ -1,0 +1,260 @@
+---
+subtitle: "EFB 796: Special Topics in Quantitative Wildlife Ecology"
+title: "**Cognitive Movement Ecology**"
+author: "Elie Gurarie and Ophélie Couriot"
+date: "SUNY-ESF, Environmental Biology - Spring 2024"
+output: 
+  xaringan::moon_reader:
+    css: [default, default-fonts, mycss.css]
+    nature:
+      highlightStyle: github
+      countIncrementalSlides: false
+      highlightLines: true
+      titleSlideClass: ["left"]
+      ratio: '16:9'
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, cache = TRUE, warning = FALSE, las = 1, dpi = 200)
+#output: html_document
+```
+
+```{r colsFunction, eval = FALSE}
+system("cp ../mycss.css ./")
+xaringan::inf_mr()
+```
+
+## Goal I: Cognitive movement ecology
+
+.pull-left[
+
+> #### What is the importance of __memory__, __learning__, __sociality__, __perception__ in understanding how/why/where animals move?
+  
+**Read papers + discuss** 
+(1 h / week)
+
+We'll cycle through leading discussions of papers most weeks.
+]
+
+.pull-right-40[
+![](images/Frontiers.png)
+]
+---
+
+## Goal II: Analyze Data & Write Manuscript (2 h / week)
+
+.pull-left-40[
+
+> Do **memory** and **collective decision making** explain how caribou (*Rangifer tarandus*) select **wintering** grounds? 
+
+> If so, **how**? 
+]
+
+.pull-right-60[
+![](images/Migrations2015-2020.png)
+]
+
+---
+
+.pull-left-50[
+## Ecological | Scientific Themes: 
+
+- Migration, range selection 
+
+- Decision making (individual and collective) 
+
+- Spatial memory 
+
+- Social learning 
+
+- Discrete-choice modeling (**probably**)
+
+- Mapping non-trivial models to testable hypotheses with data
+
+- Caribou ecology
+]
+
+
+.pull-right-50[
+![](images/FotC_Print_Full.png)
+]
+
+---
+
+.pull-left[
+## Skill goals:
+
+- Paper writing
+  - Literature review
+  - Framing questions
+  - Testing hypotheses
+  - Compiling results
+  - Discussion
+  - Submission
+  
+- R programming
+  - Process movement data
+  - Process spatial data
+  - Use **R packages** in workflow
+  
+- Collaborative project managament 
+  - GitHub
+  - Zotero
+  - Overleaf(?)
+  - Assigning tasks
+  
+
+]
+
+.pull-right[
+
+```{r, echo = TRUE}
+Rlogo <- raster::raster(
+  system.file("external/rlogo.grd",
+              package="raster")) 
+image(256-Rlogo, 
+      col = gplots::rich.colors(100), 
+      asp = 1)
+```
+]
+
+---
+
+.pull-left[
+## Rough schedule
+
+#### I: Intro to CME
+-  Discussion: 
+  - Gurarie and Avgar in review 
+  - Kashetsky et al. 2021 
+  - Fagan and Mueller 2013 
+  - Lewis et al. 2021 (optional) 
+- Class: 
+ - GitHub, package building, writing functions, data documentation 
+
+
+#### II: Collective Movements
+- Discussion: 
+ - Berdahl et al. 2018 
+ - other papers from RSB special issue
+- Class: 
+   - Data processing: movement segmentation (temporal) based on ranging area, speeds, segclust2d, Lavielle segmentation 
+]
+.pull-right[
+
+#### III: Migration
+-  Discussion: 
+  - Xu et al. 2021 
+  - Jesmer et al. 2018 
+  - Mueller et al. 2013 
+  - Teitelbaum et al. 2016 
+- Class: 
+ - Spatial clustering and discretizing movement  
+
+
+#### IV: Actual Data & Discrete Choice Modeling
+  - Avgar et al. 2015
+  - Schlägel et al. 2017
+  - Gurarie et al. 2021
+  - Rheault et al. 2021
+
+#### V: Hypothesis Generation
+
+#### VI: Preliminary Results
+
+#### VII: etc ...
+]
+
+---
+
+# Goals 
+## January 18
+
+
+
+---
+
+# Based on readings
+
+How is "cognition" defined?  
+
+--
+
+What are the most compelling examples of cognition driving movement?
+
+--
+    
+Why is it hard to study cognitive movement ecology? 
+
+--
+
+What gives us the hope / chutzpah that we can study cognition in movement of **wild** animals?  
+
+---
+
+### Spatial Memory (Fagan et al. 2013)
+
+![](images/FaganTable.png)
+---
+
+
+### Spatial Memory (Fagan et al. 2013)
+
+![](images/FaganFigure2.png)
+
+
+---
+
+### Recursion
+
+Fagan et al. emphasize recursion as evidence of memory (with caveats).
+
+
+**Question:** Is the seasonal migration phenomenon in itself necessarily proof of spatial memory?   If not, why not?   How would you parse those differences? 
+
+
+
+---
+
+## Gurarie 5-step criteria
+
+.large[
+- (A) identify an **observable behavior** that might be driven by prior experiences; 
+
+- (B) identification of **experienced cues** that might influence that behavior; 
+
+- (C) a **cognitive model**; i.e. a plausible functional relationship between movement response A to experience B; 
+
+- (D) a **statistical method** (or pattern-matching heuristic) to estimate the model C; 
+
+- (E) a **metric** for comparing the cognitive model against a non-cognitive model. 
+
+]
+
+> ## Can we use these as a guide for structuring our analysis?  
+
+
+---
+
+## Assignment: **Draft Intro**
+
+
+.large[
+Here is a proposed **paragraph** by **paragraph** outline for the Introduction:
+
+1. Cognitive movement ecology is important and hard.
+
+2. Seasonal migration / seasonal range choice is fundamental and important - could make a population resilient, could make a population vulnerable. 
+
+3. Social and collective cues are important.
+
+4. Caribou wintering grounds are important and variable and mysterious. 
+
+5. What we will do that is novel. 
+
+
+> **Individuals will pick one topic and draft one paragraph, will look up references, and report on that paragraph.**
+
+]
