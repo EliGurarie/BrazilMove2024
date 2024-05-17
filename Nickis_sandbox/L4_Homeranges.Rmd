@@ -21,6 +21,7 @@ knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
 load("./data/elk_processed.rda")
 ```
 
+
 # Subset for 3 "Residential" Individuals
 
 2004

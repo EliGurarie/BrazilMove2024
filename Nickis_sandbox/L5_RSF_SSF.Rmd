@@ -9,52 +9,387 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
 ```
 
 # Load in Data
 
 ```{r}
+load("./data/elk_processed.rda")
+```
 
+```{r}
+library(sf)
+
+library(dplyr)
+```
+
+```{r}
+
+elk_res <- elk_processed |>
+  filter(id %in% c("YL58","YL64","YL80", "YL91", "YL94"))
+
+```
+
+```{r}
+elk_res_sf <- elk_res |>
+  st_as_sf(coords = c("lon","lat"), crs=4326) |>
+  st_transform(32611)
+```
+
+
+
+```{r}
+trails_and_roads <- st_read("./Hebblewhitematerials/data/humanacess.shp") |>
+  st_transform(32611)
+```
+
+```{r}
+str(trails_and_roads)
+```
+
+```{r}
+st_crs(trails_and_roads)==st_crs(elk_res_sf)
+```
+
+
+
+```{r}
+plot(st_geometry(trails_and_roads))
+plot(elk_res_sf$geometry, add=TRUE, col="green")
+```
+
+```{r}
+library(raster)
+```
+
+
+```{r}
+landcover <- raster("./Hebblewhitematerials/data/landcover.tif")
+```
+
+```{r}
+landcover
+```
+```{r}
+plot(landcover)
+```
+```{r}
+landcover <- projectRaster(landcover, crs = crs(elk_res_sf))
+```
+
+0 - NA
+1 - Open Conifer Forest
+2 - Moderate Conifer Forest
+3 - Closed Conifer Forest
+4 - Deciduous Forest
+5 - Mixed Forest
+6 - Regeneration
+7 - Herbaceous
+8 - Shrub
+9 - Water
+10 - Rock-Ice
+11 - Cloud
+12 - Burn-Forest
+13 - Burn-Grassland
+14 - Burn-Shrub
+15 - Alpine Herb
+16 - Alpine Shrub
+
+
+```{r}
+sort(unique(round(landcover@data@values)))
+```
+
+```{r}
+landcover_rc <- reclassify(landcover, c(-Inf, 0, 0,
+                                       0, 1, 1,
+                                       1, 2, 1,
+                                       2, 3, 1,
+                                       3, 4, 1,
+                                       4, 5, 1,
+                                       5, 6, 2,
+                                       6, 7, 3,
+                                       7, 8, 3,
+                                       8, 9, 4,
+                                       9, 10, 5,
+                                       10, 11, 6,
+                                       11, 12, 7,
+                                       12, 13, 7,
+                                       13, 14, 7,
+                                       14, 15, 8,
+                                       15, Inf, 8))
+```
+
+0 - NA
+1 - Forest (Conifer, Deciduous, Mixed)
+2 - Regeneration
+3 - Herbaceous/Shrub
+4 - Water
+5 - Rock-Ice
+6 - Cloud
+7 - Burned (Forest, Grassland, Shrub)
+8 - Alpine (Herb, Shrub)
+
+
+```{r}
+sort(unique(round(landcover_rc@data@values)))
+```
+
+
+```{r}
+plot(landcover_rc)
+plot(st_geometry(elk_res_sf), add=TRUE)
 ```
 
 
 # Resource Selection Function
 
-```{r}
 
-```
-
-
-## Visualize Covariates
+## Determine "Available" Locations
 
 ```{r}
+library(sp)
 
+library(adehabitatHR)
 ```
-
-
-## Determine Available Space
 
 ```{r}
 
+elk_mcp <- mcp(as_Spatial(elk_res_sf), 100)
+
 ```
 
+```{r}
+determineAvailableLocations <- function(used_data, mcp){
+  
+  random_n <- nrow(used_data)+1000
+    
+  sample <- spsample(mcp, random_n, "random") |> st_as_sf()
+  
+  sample$id <- used_data$id[1]
+  
+  sample$Used <- FALSE
+  used_data$Used <- TRUE
+  
+  sample <- sample |> dplyr::select(id, Used, geometry)
+  used_data <- used_data |> dplyr::select(id, Used, geometry)
+  
+  combine_data <- rbind(used_data, sample)
+  
+  return(combine_data)
+}
+```
 
-## Extract Resource (Raster) Layers to Points
+```{r}
+elk_id <- split(elk_res_sf, elk_res_sf$id)
+```
+
 
 ```{r}
 
+elk_id_combine <- lapply(elk_id,
+                         determineAvailableLocations,
+                         elk_mcp)
+
+elk_combine <- do.call("rbind", elk_id_combine)
 ```
+
+## Create Covariates
+
+```{r}
+elk_mcp_sf <- elk_mcp |>
+  st_as_sf()
+```
+
+```{r}
+trails_and_roads2 <- st_crop(trails_and_roads, elk_mcp_sf)
+```
+
+do elk come within 250 m of trails?
+
+```{r}
+trails_and_roads_buff <- st_buffer(trails_and_roads2, 250) 
+```
+
+
+```{r}
+library(mapview)
+```
+
+```{r}
+mapview(trails_and_roads2)+
+  mapview(trails_and_roads_buff, col.regions="red")+
+  mapview(subset(elk_combine, Used==TRUE))
+```
+
+
+```{r}
+trails_and_roads_buff$Near_Trail <- TRUE
+
+trails_and_roads_buff <- trails_and_roads_buff[, c(40:41)]
+
+str(trails_and_roads_buff)
+```
+
+```{r}
+elk_combine2 <- st_join(elk_combine, trails_and_roads_buff, left=TRUE)
+
+elk_combine2[which(is.na(elk_combine2$Near_Trail)),]$Near_Trail <- FALSE
+
+```
+
+```{r}
+mapview(trails_and_roads2)+
+  mapview(subset(elk_combine2, Used==TRUE), zcol="Near_Trail")
+```
+
+
+
+## Extract Resource (Raster) Layer to Points
+
+```{r}
+elk_combine_sp <- as(elk_combine2, Class="Spatial")
+
+```
+
+```{r}
+landcover_elk <- extract(landcover_rc, elk_combine_sp)
+```
+
+```{r}
+elk_combine2$Landcover <- landcover_elk
+```
+
+## Prepare Data for Modeling
+
+0 - NA
+1 - Forest (Conifer, Deciduous, Mixed)
+2 - Regeneration
+3 - Herbaceous/Shrub
+4 - Water
+5 - Rock-Ice
+6 - Cloud
+7 - Burned (Forest, Grassland, Shrub)
+8 - Alpine (Herb, Shrub)
+
+```{r}
+elk_df <- data.frame(elk_combine2)
+
+elk_df$Landcover <- as.factor(elk_df$Landcover)
+
+elk_df2 <- elk_df |> dplyr::mutate(No_Data = grepl("0", Landcover),
+                         Forest = grepl("1", Landcover),
+                         Regeneration = grepl("2", Landcover),
+                         Herbaceous_Shrub = grepl("3", Landcover),
+                         Water = grepl("4", Landcover),
+                         Rock_Ice = grepl("5", Landcover),
+                         Cloud = grepl("6", Landcover),
+                         Burned = grepl("7", Landcover),
+                         Alpine = grepl("8", Landcover))
+```
+
 
 
 ## Fit RSF 
 
+```{r}
+library(ggplot2)
+```
+
+
+```{r fig.height=3.5, fig.width=10}
+
+landcover_count <- count(elk_df2, Landcover, Used)
+
+ggplot() +
+  geom_bar(data = landcover_count, aes(x = Landcover, y = n, fill = Used), position="dodge", stat="identity") +
+  scale_x_discrete(labels=c("Forest","Regeneration","Herbaceous_Shrub","Water", "Rock_Ice","Cloud","Burned","Alpine")) +
+  theme_classic() +
+  labs(x = "Landscape Class", y = "Count")
+```
+
+
 ### Binomial GAM
 
 ```{r}
+elk_glm <- glm(Used ~ Near_Trail + Forest + Herbaceous_Shrub + Water + Burned + Alpine, data = elk_df2, family = "binomial")
 
+summary(elk_glm)
 ```
 
+```{r}
+elk_glm2 <- glm(Used ~ Near_Trail + Herbaceous_Shrub + Water + Burned + Alpine, data = elk_df2, family = "binomial")
+
+summary(elk_glm2)
+```
+no difference because there are no alpine values
+
+```{r}
+anova(elk_glm, elk_glm2, test="Chi")
+```
+
+The AIC (Akaike information criterion) is a measure of fit that penalizes for the number of parameters
+
+want a lower AIC
+
+
+```{r}
+AIC(elk_glm, elk_glm2)
+```
+
+```{r}
+model_summary <- data.frame(summary(elk_glm)$coefficients)
+
+glm_results <- model_summary |> 
+          dplyr::mutate(low = Estimate - 2*Std..Error, high = Estimate + 2*Std..Error) 
+
+glm_results$variable <- row.names(glm_results)
+
+ggplot(glm_results, aes(x = Estimate, variable)) + 
+  geom_errorbarh(aes(xmin = low, xmax = high)) + 
+  geom_point() +
+  theme_classic() +
+  ylab("Landscape Class")+
+  geom_vline(xintercept = 0, linetype="dotted", 
+                color = "red", size=1.5) +
+  scale_y_discrete(labels=c("Intercept","Alpine","Burned","Forest","Herbaceous_Shrub","Near_Trail","Water"))
+```
+
+
 ### Binomial GAMM
+
+```{r}
+library(glmmTMB)
+```
+
+```{r}
+elk_glmm <- glmmTMB(Used ~ Near_Trail + Herbaceous_Shrub + Water + Burned + Alpine + (1|id), data = elk_df2, family = binomial)
+
+summary(elk_glmm)
+```
+
+```{r}
+model_summary <- data.frame(summary(elk_glmm)$coefficients$cond)
+
+glmm_results <- model_summary |> 
+          dplyr::mutate(low = Estimate - 2*Std..Error, high = Estimate + 2*Std..Error) 
+
+glmm_results$variable <- row.names(glmm_results)
+
+ggplot(glmm_results, aes(x = Estimate, variable)) + 
+  geom_errorbarh(aes(xmin = low, xmax = high)) + 
+  geom_point() +
+  theme_classic() +
+  ylab("Landscape Class")+
+  geom_vline(xintercept = 0, linetype="dotted", 
+                color = "red", size=1.5) +
+  scale_y_discrete(labels=c("Intercept","Alpine","Burned","Forest","Herbaceous_Shrub","Near_Trail","Water"))
+```
+
+
+
 
 
