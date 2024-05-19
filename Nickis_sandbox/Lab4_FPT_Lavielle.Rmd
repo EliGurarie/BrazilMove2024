@@ -1,0 +1,218 @@
+---
+title: "L3_ Segmentation Methods"
+author: "Nicole Barbour"
+date: "2024-05-17"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
+```
+
+# Load Data In
+
+First, let's load in our processed data from lab 1.
+
+```{r}
+load("./data/elk_processed.rda")
+
+head(elk_processed)
+```
+
+# Select Example Individual and Visualize
+
+We will use one individual from our data as an example, "YL96". This individual has some "patches" of residency- like behavior along its track.
+
+```{r}
+elk_example_data <- subset(elk_processed, id == "YL96")
+```
+
+
+We can use Base R to visualize the track of this individual in space and time:
+
+
+```{r}
+ggplot(data=elk_example_data, aes(x=lon, y=lat)) +
+  geom_path(size=0.5) +
+  theme_classic()
+```
+
+
+# First Passage Time
+
+First Passage Time (FPT) can be a useful paramter to describe scales of behavior along a movement track. 
+
+It is generally defined as the time observed for an animal to pass through a circle, with radius "r", where "r" defines the scale of behavior.
+
+The variance of the log of the FPT can be used to select this scale, "r", with a high variance (peak) being seen for scales often used by more residential-like behavior (e.g., slower, more tortuous movements).
+
+## Transform Data into "ltraj" Format
+
+First Passage Time is calculated using the "adehabitatLT" package. We will also need the "sf" package. 
+
+```{r}
+library(adehabitatLT)
+library(sf)
+```
+
+In order to fit the `fpt` function, we first need to:
+
+1 - make our data spatial (sf)
+2 - convert our data to be SpatialPoints format (from another spatial package, sp)
+
+
+
+```{r}
+elk_example_sp <- elk_example_data |>
+  st_as_sf(coords=c("lon","lat"), crs= 4326) |> 
+  st_transform(32611) |>
+  st_cast("POINT") |> 
+  as_Spatial()
+
+str(elk_example_sp)
+```
+
+We can now use the `as.ltraj` function to convert out data into ltraj format.
+
+```{r}
+elk_example_traj <- as.ltraj(coordinates(elk_example_sp), date=elk_example_data$date, id = elk_example_data$id)
+
+summary(elk_example_traj)
+```
+We can use the `head` function to look at the ltraj data table for this individual.
+
+```{r}
+head(elk_example_traj[[1]])
+```
+We can also plot the trajectory of the individual, which shows the start and end locations in red and blue.
+
+```{r}
+plot(elk_example_traj)
+```
+
+
+We can now apply the `fpt` function, first testing a variety of radii (50,000 - 100,000 m).
+
+```{r}
+elk_example_fpt <- fpt(elk_example_traj, radii = seq(1000, 10000, by = 1000), units="hours")
+```
+
+Next, we can use the `varlogfpt` function on our FPT object to see if we can find a peak in the variance at one of the spatial scales of interest.
+
+We can see a plateau in the variance at ~4000-5000 m.
+ 
+```{r}
+varlogfpt(elk_example_fpt, graph=TRUE)
+```
+
+Now that we have decided on our spatial scale of interest, we can refit our `fpt' function and plot the results.
+
+```{r}
+elk_example_fpt <- fpt(elk_example_traj, radii = 5000, units="hours")
+
+plot(elk_example_fpt, scale = 5000, warn = FALSE)
+```
+
+We can bind our FPT values to our data as a column by extacting it from our FPT object.
+
+We can plot these values over our latitude values by scaling both of them (`scale` function). Periods of higher FPT seem to mostly correspond to the distinct patches of possible "residential" behavior.
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+
+elk_example_data$FPT <- elk_example_fpt[[1]]$r1
+
+ggplot() +
+  geom_path(data = elk_example_data, aes(x = datetime, y = scale(FPT)), color="darkgrey", size = 1) +
+  geom_path(data = elk_example_data, aes(x = datetime, y = scale(lat)), color ="orange", alpha = 0.6, size = 1) +
+  geom_point(data = elk_example_data, aes(x = datetime, y = scale(FPT))) +
+  theme_classic() +
+  ylab("Scaled FPT (grey) vs Latitude (orange)")
+```
+
+
+
+
+# Lavielle Method
+
+Lavielle’s method identifies break points in a timeseries by applying a moving window over the timeseries. The optimal number of segments, k, in the timeseries is then determined by minimizing the "penalized contrast function" (Lavielle 2005). Break points are determined using the mean, variance, or mean AND variance along the timeseries.
+
+WE will use the same example dataset as previous, to compare results.
+
+```{r}
+str(elk_example_data)
+```
+This method also uses the "adehabitatLT" package. 
+
+The Lavielle Method is fit using the `laveielle` function, where the user can specify the:
+
+  1 - variable from the dataset to distinguish the segments by (here, we will use latitude)
+  
+  2 - Lmin - the minimum number of relocations within a segment
+  
+  3 - Kmax - the maximum number of segments to "try out"
+  
+  4 - type - how to distinguish the segments (mean, variance, or both, "meanvar")
+  
+We can use the visualizations of the track to inform our decisions on these parameters. Here, we will use a minimum of 20 locations, max of 5 segments, and the mean to determine segments by latitude.
+
+
+```{r}
+
+elk_lavielle_example <- lavielle(elk_example_data$lat, Lmin = 20, Kmax = 5, type = "mean")
+```
+
+After fitting, we can use the `chooseseg` function to identify the number of segments.
+
+Here it looks the the optimal number, k, is 3.
+
+```{r}
+chooseseg(elk_lavielle_example)
+```
+
+We can now create a nice plot of these segments, with the change in latitude over time and the red lines dilineating the break points for each segment.
+
+```{r}
+elk_lavielle_example_path <- findpath(elk_lavielle_example, 3)
+```
+
+If we wanted to bind these predictions back to our data, we can do so in a series of steps, first extracting the breakpoints as a vector from our previous object, then adding them to the original data using the `merge` function and the "tidyr" package's, `fill` function to fill in values with their corresponding segment.
+
+```{r}
+
+breakpoints <- unlist(elk_lavielle_example_path)
+
+breakpoints
+```
+
+```{r}
+breakpoints_df <- data.frame(Row_ID = breakpoints, segment = c(1,1,2,2,3,3))
+
+elk_example_data$Row_ID <- cumsum(rep(1, nrow(elk_example_data)))
+
+elk_example_data_lav <- merge(elk_example_data, breakpoints_df, by="Row_ID", all.x=TRUE)
+
+elk_example_data_lav <- tidyr::fill(elk_example_data_lav, segment, .direction = 'down')
+
+head(elk_example_data_lav)
+```
+
+We can visualize the final results using ggplot. 
+
+```{r}
+elk_example_data_lav$segment <- as.character(elk_example_data_lav$segment)
+
+ggplot(data=elk_example_data_lav, aes(x=datetime, y=lat, color = segment)) +
+  geom_path()+
+  theme_classic()
+```
+
