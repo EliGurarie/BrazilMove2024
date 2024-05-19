@@ -26,6 +26,9 @@ elk_gps <-subset(elk, sensor.type=="gps")
 save(wolf_gps, file="./data/wolf_gps.rda")
 save(elk_gps, file="./data/elk_gps.rda")
 
+# write to csv
+write.csv(elk_gps, file="C:/Users/nicol/Documents/BrazilMove2024/data/Elk_GPS_data.csv")
+
 # -----------------------------------------------------------------------
 
 # Mountain tapir, Colombia (N=3)

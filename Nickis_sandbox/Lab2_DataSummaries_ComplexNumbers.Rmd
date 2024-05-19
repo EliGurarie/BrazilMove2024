@@ -1,0 +1,321 @@
+---
+title: 'Lab 2: Data Summaries and Complex Numbers'
+author: "Nicole Barbour"
+date: "2024-05-18"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
+```
+
+# Load In Processed Data
+
+We will load in the data we created in the previous exercise.
+
+```{r}
+
+load(file="./data/elk_processed.rda")
+
+head(elk_processed)
+```
+
+# Select Individuals
+
+## Create a Summary Table of Tracks
+
+```{r}
+library(dplyr)
+```
+
+Before selecting individuals we wish to use for our analyses, it's helpful to create a data frame that summarizes tracks by their tracking durations.
+
+The `difftime` function is useful for determining the difference in time between successive time points.
+
+
+```{r}
+elk_processed |> group_by(id) |> 
+  summarize(Min_Time = min(datetime),
+            Max_Time = max(datetime),
+            Duration = round(difftime(max(datetime), min(datetime), units = "days")))
+```
+
+It's also helpful to use the `summary` function to summary statistics for the tracking duration of all the individuals in our dataset.
+
+Looks like there are some very short tracks that we might want to drop!
+
+```{r}
+elk_processed |> group_by(id) |>
+  summarize(time_range = as.numeric(difftime(max(datetime), min(datetime), units ="days"))) |> 
+  summary()
+```
+
+## Visualize Tracking Durations
+
+We can use the "ggplot2" package to visualize the tracking durations for all individuals.
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+ggplot(data = elk_processed, aes(x = datetime,y = id, color = id))+ 
+  geom_path(linewidth=1) +
+  theme_classic() + 
+  xlab("Time") + ylab("ID")+ 
+  theme(legend.position = "none")
+```
+
+
+
+## Drop Individuals with Short Tracks
+
+Using the `subset` function combine with the "%in%" operator, we can filter out the individuals we with very short tracks. 
+
+```{r}
+elk_processed2 <- subset(elk_processed, !id %in% c("GP1", "YL72", "YL79"))
+```
+
+The tracks look much better now!
+
+```{r}
+ggplot(data = elk_processed2, aes(x = datetime, y = id, color = id))+ 
+  geom_path(linewidth=1) +
+  theme_classic() + 
+  xlab("Time") + ylab("ID")+ 
+  theme(legend.position = "none")
+```
+
+# Convert Coordinates Into Complex Numbers
+
+Complex data compress multi-dimensional data (e.g., X, Y polar coordinates) into one number. This is very useful for calculations used in movement ecology, such as determining the displacement distance or turning angles between successive locations.
+
+The formula to create a complex number (Z) from polar coordinates (X, Y) is: Z = X + iY
+
+In this formula, “i” represents a constant and the polar coordinates, X and Y, are referred to as the “real” and “imaginary” portions of the complex number. 
+
+## Convert CRS to Projected Coordinate System
+
+Before converting our locations to complex numbers, we first need to make our data spatial and then project the coordinate reference system (CRS) to one with measurable units (e.g., UTM).
+
+We can use the `st_transform` function for this, specifying UTM Zone 11 North for our elk data (EPSG Code: 32611).
+
+```{r}
+library(sf)
+```
+
+
+```{r}
+elk_utm <- elk_processed2 |>
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) |>
+  st_transform(32611)
+
+elk_utm
+```
+
+Now we can extract the matrix of projected coordinates for our data with the `st_coordinates` function, then passing the X and Y information to individual columns in our sf data.
+
+```{r}
+
+xy_coords <- st_coordinates(elk_utm)
+
+elk_processed2$X <- xy_coords[,1]
+elk_processed2$Y <- xy_coords[,2]
+```
+
+## Calculate Complex Locations
+
+Now that we have X and Y columns in our data, we can plug these into our complex number formula to get complex locations (Z).
+
+```{r}
+
+elk_processed2$Z <- elk_processed2$X + 1i*elk_processed2$Y
+```
+
+We can also do this using the `complex` function (see "?complex" for more info).
+
+```{r}
+elk_processed2$Z <- complex(re = elk_processed2$X, im = elk_processed2$Y)
+```
+
+```{r}
+str(elk_processed2)
+```
+
+# Visualize Tracks (Multiple Dimensions)
+
+We can use Base R to create a plot with the X/Y coordinates for each individual, showing changes in X/Y over space and changes in X vs Y over time. This is a helpful way to visually identify where movement-based behaviors may be occurring within a track.
+
+Let's try it on one individual, GP1.
+
+
+
+```{r, eval =FALSE}
+
+GP1 <- subset(elk_processed2, id == "GP1")
+
+layout(cbind(c(1,1),2:3))
+par(bty = "l", mar = c(2,2,2,2))
+
+with(GP1, {
+  plot(X, Y, asp =1, pch = 19, cex = 0.7)
+  plot(date, X, pch = 19, cex = 0.7)
+  plot(date, Y, pch = 19, cex = 0.7)
+})
+```
+
+# Calculate Movement Metrics
+
+Now that we have our data as complex locations, we can easily quantify useful movement metrics for our elk, such as step lengths (straight line displacement between consecutive locations) and relative turning angles (difference in absolute direction between consecutive locations).
+
+Following our rule of "generalizable" data processing, we will create a function that calculates these movement metrics for an individual. 
+
+The step length, also called the "Modulus", can be calculated with the formula: sqrt(X^2 + Y^2). It can also be extracted from a complex number with the function `Mod()`. 
+
+The absolute angle between locations is called the "Argument" and can be extracted from a complex number with the function “Arg()”.
+
+## Define Function
+
+We define our function in code chunk below, assigning it a name and an input object ("dataframe").
+
+```{r}
+getMovementMetrics <- function(dataframe){
+  
+  move_step <- diff(dataframe$Z)  
+
+  time_step <- as.numeric(difftime(dataframe$datetime[-1], dataframe$datetime[-length(dataframe$datetime)], "days"))
+
+  absolute_turnangle <- Arg(move_step)
+
+  relative_turnangle <- diff(absolute_turnangle)
+
+  step_length_km <- Mod(move_step)/1000
+  
+  dataframe$time_step_days <- c(NA, time_step)
+
+  dataframe$move_rate_km_day <- c(NA, step_length_km/time_step)
+
+  dataframe$step_length_km <- c(NA, step_length_km)
+
+  dataframe$relative_turnangle <- c(NA, NA, relative_turnangle)
+  
+  return(dataframe)
+}
+```
+
+## Calculate for All Individuals At Once
+
+Now that we have a function that will calculate and annotate the movement metrics for an individual's dataframe, we can use a couple different functions in R to run our function on all of our individuals at once.
+
+The first is the `lapply` function. First, we have to convert our elk dataframe into a list of dataframes for each id. We can do this using the `split` function.
+
+```{r}
+elk_id <- split(elk_processed2, elk_processed2$id)
+```
+
+Now we can use `lapply` to apply our function to each element in our list. The resulting object is also a list, with each element being an individual dataframe, now annotated with the movement metrics.
+
+We can convert our elk list object back to one big dataframe using the `do.call` function.
+
+```{r}
+elk_id_move <- lapply(elk_id,
+                         getMovementMetrics)
+
+elk_move <- do.call("rbind", elk_id_move)
+
+str(elk_move)
+
+```
+
+The other method, which is even more efficient, uses the "`ddply` function from the "plyr" R package.
+
+```{r}
+elk_move<- elk_processed2 |> 
+  plyr::ddply("id", getMovementMetrics)
+
+str(elk_move)
+```
+
+# Visualize and Summarize Movement Metrics
+
+
+## Check the Fix Rate
+
+Checking the fix rate, we can see that the data is irregular in time, meaning that step lengths are not comparable over the tracks but the movement rate (km/day) is.
+
+```{r}
+dtime <- function(t, ...) {difftime(t[-1], t[-length(t)], ...) %>% as.numeric}
+
+fix_rate <- elk_move |> 
+  group_by(id) |>
+  arrange(datetime) |>
+  mutate(dtime = c(0,round(dtime(datetime, units ="hours")))) |>
+  data.frame() |>
+  ungroup()
+
+barplot(table(fix_rate$dtime))
+```
+
+
+## Summarize the Fix Rate and Movement Rate
+
+We can use similar methods to previously to summarize our move metrics.
+
+```{r}
+summary(fix_rate$dtime)
+```
+
+```{r}
+summary(elk_move$move_rate_km_day)
+```
+
+
+```{r}
+elk_move |>
+  group_by(id) |>
+  filter(is.na(move_rate_km_day)==FALSE) |>
+  summarize(Min_MoveRate = min(move_rate_km_day),
+            Max_MoveRate = max(move_rate_km_day),
+            Avg_MoveRate = mean(move_rate_km_day))
+```
+
+## Visualize Step Lengths and Turning Angles
+
+Visualizing step lengths and turning angles is useful for informing analyses, such as various segmentation methods (e.g., Hidden Markov Models).
+
+```{r}
+steplengths <- na.omit(elk_move$step_length_km)
+
+hist(steplengths, col="grey", bor="black", freq=FALSE, breaks=50, main ="Steplengths (km)")
+lines(density(steplengths), col=2, lwd=2)
+```
+We can use the "circular" R package to create a rose diagram of our turning angles, which require circular statistics. 
+
+```{r}
+library(circular)
+```
+
+
+```{r, message=FALSE}
+turningangles <- as.circular(na.omit(elk_move$relative_turnangle))
+
+rose.diag(turningangles, bins=20, col="grey", prop=2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

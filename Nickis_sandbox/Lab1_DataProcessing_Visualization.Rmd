@@ -1,0 +1,411 @@
+---
+title: 'Lab 1: Data Processing & Visualization'
+author: "Nicole Barbour"
+date: "2024-05-18"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
+
+
+```
+
+# The Example Data for This Course
+
+(put photo of elk here)
+
+The data we will be working with throughout this course consist of GPS tracking data for Ya Ha Tinda elk (**Cervus canadensis**) from [Hebblewhite et al 2008](https://doi.org/10.1890/06-1708.1) and the [Ya Ha Tinda Elk Project](https://www.umt.edu/yahatinda/). 
+
+Some elk in this population are migratory (migrating to to Banff National Park in the summer), others are residential to the Ya Ha Tinda area year-round, and others have demonstrated "switching" behavior between residential and migratory.
+
+This data is also available on [Movebank](https://www.movebank.org/cms/movebank-main).
+
+# Data Processing in R
+
+## Principles of Data Processing
+
+Data that has been processed "smartly" will have the following features:
+
+* **Compartamentalized** - e.g., each step in your code/methods uses functions and the most efficient code possible
+
+* **Interactive** - e.g., leverage visualization and interactive tools
+
+* **Generalizable** - e.g., able to be applied to multiple individuals
+
+* **Replicable** - e.g., saving your code and data products regularly and NEVER overwriting the raw data
+
+* **Well-Documented** - e.g., commenting your code along the way, keeping files in organized folders, and storing methods in an external document as you go
+
+Follow these guidelines and you will save yourself from many future data processing head aches!
+
+## Bringing Data into R 
+
+Data can be brought into R many ways:
+
+* `read.csv` - a Base R function to read in CSV files by calling the file path of wherever the file is stored
+
+* `load` - a Base R function to load in an Rda object ("R data object")
+
+* `getMovebankData` - function from the "move" package (Kranstauber et al 2023) to retrieve Movebank datasets by name
+
+### Read a CSV File In
+
+Excel loves to mess up date/time information, so be sure to check that your datetime column is formatted correctly (to include both the data AND time, with hours, minutes, & seconds, if applicable) before reading it into R. 
+
+The file path should correspond to wherever you saved your CSV file on your computer.
+
+```{r}
+elk_gps <- read.csv("./BrazilMove2024/data/Elk_GPS_data.csv")
+
+str(elk_gps)
+```
+
+### Load an Rda Object
+
+Rda objects are a useful way to store data. Essentially, R stores your object(s) as a compressed ".rda" file (R file type). This does not work with raster data, but will work with most other object types.
+
+It's also good practice to save your intermediate R objects in a "Data" folder in your R project or repository. For example, a great time to save your data would be after processing!
+
+You can save data using the `save` Base R function and then `load` it, using the same file path you saved it to.
+
+When saving, don't forget to add the file name and type at the end of the file path!
+
+```{r eval = FALSE}
+save(elk_gps, file="./data/elk_gps.rda")
+```
+
+```{r}
+load("./data/elk_gps.rda")
+
+str(elk_gps)
+```
+
+
+### Load In Movebank Data
+
+[Movebank](https://www.movebank.org/cms/movebank-main) is an incredibly useful (online) resource and repository for storing and accessing tracking datasets for a variety of species. 
+
+Public data can be downloaded either online or through the "move" R package. After installing the package (`install.package`), we can load the package for use in our R session using the `library` Base R function.
+
+```{r}
+library(move)
+```
+
+You will need to make a Movebank account and login first, using the `movebankLogin` function.
+
+```{r}
+mylogin <- movebankLogin(username = 'YourUsername', password = 'yourpassword')
+```
+
+```{r include=FALSE}
+mylogin <- movebankLogin(username = 'NickiB', password = 'Ne*5ne@ZrfT5QtS')
+```
+
+Now you can use your login information object within the `getMovebankData` function to access the study you are interested in. 
+
+Let's access the [Elk Movebank Dataset](https://www.movebank.org/cms/webapp?gwt_fragment=page=studies,path=study72264071).
+
+```{r}
+elk_move <- getMovebankData(study = "Ya Ha Tinda elk project, Banff National Park (data from Hebblewhite et al. 2008)", login = mylogin, removeDuplicatedTimestamps=TRUE)
+```
+
+```{r}
+head(elk_move)
+```
+
+The `getMovebankData` function will result in a "MoveStack" object, which is specially formatted for the "move" package functions.
+
+We can convert it to a basic R data frame object using the 
+
+```{r}
+elk_df <- as.data.frame(elk_move)
+
+str(elk_df)
+```
+
+## Data Processing Steps
+
+Processing data will always be specific to your data and needs. Sometimes it can be helpful to do some processing and data cleaning outside of R (e.g., within Excel). It can be helpful to diagram or write out your data processing needs BEFORE trying to draft your code.
+
+But generally, R is a powerful tool for quick, efficient, and reproducible data processing and cleaning. If there is ever something you don't know how to do in R, a quick Google search or taking a look at one of the many R resources online (e.g., [R-Bloggers](https://www.r-bloggers.com/) or [Stack Overflow](https://stackoverflow.com/)).
+
+### Step 1: Re-Name or Drop Columns
+
+The "[]" operator can be used to grab specific columns their number in a dataframe.
+
+Let's drop the 4th and 5th columns from our "elk_gps" dataset.
+
+```{r}
+elk_gps <- elk_gps[, -c(4:5)]
+```
+
+Columns can be renamed using the `names` Base R function anf a vector of the names you want, as text and in the order you want.
+
+Let's rename our columns to "datetime", "lon", "lat", and "id".
+
+```{r}
+names(elk_gps) <- c("datetime", "lon", "lat", "id")
+```
+
+### Step 2: Convert DateTime Column to Posixct Format
+
+R reads datetime data in a particular way. Converting your datetime column to "Posixct" format will ensure that R reads that column as a datetime information, not just a character.
+
+To format a column to be "Posixct" format, you can use the `as.POSIXct` function. 
+
+Here, you need to be careful to specify the format of the datetime column **exactly** as it is, using Posixct syntax (eg, "%m" for month, "%d" for day, "%Y" for year, "%H" for hours, "%M" for minutes, and "%S" for seconds).
+
+Let's check the format of our datetime column:
+
+```{r}
+elk_gps$datetime[1]
+```
+
+
+```{r}
+elk_gps$datetime <- as.POSIXct(elk_gps$datetime, format="%m/%d/%Y %H:%M:%S")
+
+str(elk_gps)
+```
+
+### Step 3: Check for Missing Data
+
+R stores missing values as "NA". 
+
+You can check for NA values in a vector or column using the `is.na` function, which handily will return a vector the same length, with TRUE where there are NA's and FALSE where there are not NA's.
+
+Let's use the `subset` Base R function to select only the rows in our elk data where there are no NA's for datetime, lat, or lon. 
+
+```{r}
+elk_gps2 <- subset(elk_gps, is.na(datetime)==FALSE & is.na(lon)==FALSE & is.na(lat)==FALSE)
+```
+
+### Step 4: Check for Duplicate Data, Sort By Time
+
+Duplicated data can falsely inflate your data and result in conflicts with various functions.
+
+We will use the "dplyr" R package for more data organizing and cleaning. 
+
+```{r}
+library(dplyr)
+```
+
+
+We will use the "|>" native R pipe to efficiently run multiple functions at once on an object.
+
+Before filtering out duplicate datetime data and sorting our data, we first need to group the data by each individual in our dataset (our "id" column) so that the functions are applied to each individual separately.
+
+
+```{r}
+elk_gps3 <- elk_gps2 |>
+  group_by(id) |>
+  filter(!duplicated(datetime)) |>
+  arrange(datetime) |>
+  ungroup() |>
+  data.frame()
+
+head(elk_gps3)
+```
+
+### Step 5: Make Data Spatial 
+
+Spatial data in R comes in multiple formats (vectors, e.g. points, lines, and polygons, or rasters). 
+
+There are multiple packages in R for formatting spatial data but a fan favorite is the "sf" package. 
+
+```{r}
+library(sf)
+```
+
+If you have spatial data stored as shapefiles or rasters, these can be read in with the "sf" package (vectors) or the "raster" package. We won't cover that in this lab but we will cover some of this in the RSF/SSF lab.
+
+For now, we can convert our data to "sf" format, using the `st_as_sf` function, specifying the columns with our coordinate information (latitude first, then longitude) and the Coordinate Reference System EPSG code (4326 corresponds to WGS 1984, a Geographic Coordinate System for data with coordinates in units of decimal degrees).
+
+```{r}
+elk_sf <- elk_gps3 |>
+  st_as_sf(coords = c("lon","lat"), crs=4326)
+
+elk_sf
+```
+
+
+# Visualizations
+
+Visualizing data is an important step in the data processing and analysis stages.
+
+Learning how to visualize your data correctly can help you catch errors in your code, outliers in your data, and observe interesting patterns that will inform your analysis choices.
+
+Visualization can be done with Base R plotting or the "ggplot2" R package, which is excellent for creating complex plots in one line of code.
+
+```{r}
+library(ggplot2)
+```
+
+## Visualize Tracks
+
+### Base R
+
+```{r}
+layout(cbind(c(1,1),2:3))
+par(bty = "l", mar = c(2,2,2,2))
+
+with(elk_gps3, {
+  plot(X, Y, asp =1, col = c("orange","blue")[state], pch = 19, cex = 0.7)
+  segments(X[-length(X)], Y[-length(Y)], 
+           X[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
+  plot(date, X, col = c("orange","blue")[state], pch = 19, cex = 0.7)
+  segments(date[-length(X)], Y[-length(Y)], 
+           date[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
+  plot(date, Y, col = c("orange","blue")[state], pch = 19, cex = 0.7)
+  segments(date[-length(X)], Y[-length(Y)], 
+           date[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
+})
+```
+
+### ggplot
+
+The `ggplot` function takes arguments for the data object to be plotted, the x and y axis variables to be plotted (within the `aes()` function), additional aesthetic arguments (e.g., color or linewidth), and additive functions that define the plot type.
+
+Let's make a plot for the elk individual "GP1", using latitude for the X axis, longitude for the y-axis, and using points and a connecting "path" between points to plot the track.
+
+```{r}
+GP1 <- subset(elk_gps3, id=="GP1")
+
+ggplot(data = GP1, aes(x = lon, y = lat)) +
+  geom_point()+
+  geom_path(size = 0.5, color = "darkgrey") +
+  theme_classic()
+```
+
+Now let's visualize all individuals at once, using the additional `facet_wrap` function to facet or group our plots by each elk id. 
+
+```{r fig.height=20, fig.width=9}
+ggplot(data=elk_gps3, aes(x = lon, y = lat)) +
+  geom_path(size = 0.5, color = "darkgrey") +
+  geom_point() +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol=3)
+
+```
+
+Another useful plot is latitude versus datetime. This can be especially helpful for identifying migrational patterns (e.g., residency vs transiting).
+
+```{r fig.height=20, fig.width=9}
+ggplot(data = elk_gps3, aes(x = datetime, y = lat)) +
+  geom_path(size = 0.5) +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol = 3)
+```
+
+## Spatial Plots and Mapping
+
+### Base R plots
+
+sf objects can be plotted by their attributes using the `plot` Base R function.
+
+For example, we can plot the points (or "geometry") for the "GP1" elk from above.
+
+```{r}
+GP1 <- subset(elk_sf, id == "GP1")
+
+plot(GP1$geometry, pch = 19)
+```
+
+Without a background map, this plot is not very informative!
+
+The "mapdata" package can be useful for adding a background map to a spatial plot.
+
+```{r}
+library(mapdata)
+```
+
+```{r}
+map("state", "wisconsin")
+plot(GP1$geometry, pch = 19, color="purple", add = TRUE)
+```
+
+```{r}
+wisconsin <- map_data("state", "wisconsin") |> data.frame()
+
+wisconsin_sf <- st_as_sf(wisconsin, coords = c("long", "lat"), 4326)
+```
+
+
+
+
+
+### ggplot and ggspatial
+
+We can use the "ggspatial" package to add open map tiles to the background of our map.
+
+Note that this can be memory-intensive if you are plotting a lot of data at a high resolution ...
+
+```{r}
+library(ggspatial)
+```
+
+The “ggspatial” R package is great for making nice maps, using Open Street Map tiles (open source).
+
+The `annotation_map_tile` function allows you to specify a background map type (“type=”) and zoom level (“zoom=”, where a higher zoom is a higher resolution but may take longer to render). You can run the code “rosm::osm.types” to see all the different map tile types available (we will use the “osm” one).
+
+You can also add some nice map features, such as a scale bar (function `annotation_scale()`) and a north arrow (function `annotation_north_arrow()`, with arguments for specifying height, width, padding dimensions).
+
+You can then add on your other, regular ggplot functions, such as `geom_sf` and theme options.
+
+```{r}
+box <- st_bbox(c(xmin = -116.5, xmax = -115.3, ymax = 52.2, ymin = 51.4), crs = st_crs(4326))
+
+ggplot() +
+  annotation_map_tile(type = 'osm', zoom = 3) +
+  annotation_scale()+
+  annotation_north_arrow(height=unit(0.5,"cm"), width=unit(0.5,"cm"), pad_y = unit(1,"cm"))+
+  #shadow_spatial(box)+
+  ylab("Latitude") + xlab("Longitude")+
+  geom_sf(data=elk_sf,aes(), color="orange", size=2)+
+  #scale_y_continuous(breaks=c(43.03, 43.04, 43.05, 43.06, 43.07))+
+  #scale_x_continuous(breaks=c(-76.175, -76.165,-76.155,-76.145,-76.135))+
+  theme_classic()
+```
+
+
+
+### mapview
+
+Interactive mapping in R with the "mapview" R package is a useful way to visualize and engage with spatial data.
+
+```{r}
+library(mapview)
+```
+
+Let's create spatial tracks of our elk data, using the sf version. 
+
+We use the `summarize` function and the `st_cast` function with the `group_by` function to create individual elk tracks.
+
+
+```{r}
+elk_tracks <- elk_sf |> 
+  group_by(id) |> 
+  summarize(do_union=FALSE) |> 
+  st_cast("LINESTRING")
+```
+
+```{r}
+mapview(elk_tracks, zcol="id")
+```
+
+# Save Your Processed Data
+
+```{r, eval=FALSE}
+elk_processed <- elk_gps3
+
+save(elk_processed, file="./data/elk_processed.rda")
+```
+
+
+
