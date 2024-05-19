@@ -1,6 +1,6 @@
 ---
-subtitle: "Brazil Move 2024"
 title: "**Summaries and Visualizations**"
+subtitle: "Brazil Move 2024"
 author: "Elie Gurarie and Nicki Barbour"
 output: 
   xaringan::moon_reader:

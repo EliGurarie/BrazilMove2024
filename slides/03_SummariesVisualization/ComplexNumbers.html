@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Short Lecture on Complex Numbers</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Elie Gurarie" />
+    <script src="ComplexNumbers_files/header-attrs-2.25/header-attrs.js"></script>
+    <link href="ComplexNumbers_files/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="ComplexNumbers_files/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="mycss.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, title-slide
+
+.title[
+# Short Lecture on Complex Numbers
+]
+.subtitle[
+## Brazil Move 2024
+]
+.author[
+### Elie Gurarie
+]
+
+---
+
+
+
+
+
+
+
+
+
+
+.pull-left[
+
+## Why complex numbers? 
+
+&gt; The  **most efficient way** to deal with 2D vectors, both in .red[math] and in .blue[R code]. 
+
+&gt; They are simple!
+]
+
+--
+
+.pull-right[
+
+## What is a complex number? 
+
+$$ Z = X + iY $$
+
+- `\(X\)` is the **real** part.  
+- `\(Y\)` is the **imaginary** part.
+
+The same number can be written:
+
+$$ Z = R \exp(i \theta) $$
+- `\(R\)` is the length of the vector: the **modulus**
+- `\(\theta\)` is the orientation of the vector: the **argument**
+]
+
+---
+
+
+.pull-left-30[
+## An example
+
+
+```r
+X &lt;- c(3,4,-2)
+Y &lt;- c(0,3,2)
+Z &lt;- X + 1i*Y
+Z
+```
+
+```
+## [1]  3+0i  4+3i -2+2i
+```
+Alternatively: 
+
+]
+
+.pull-right-70[
+
+
+```r
+plot(Z, pch=19, col=1:3, asp=1)
+arrows(rep(0,length(Z)), rep(0,length(Z)), Re(Z), Im(Z), lwd=2, col=1:3)
+```
+
+![](ComplexNumbers_files/figure-html/plotZ-1.png)&lt;!-- --&gt;
+&gt; *Note: ALWAYS use `asp=1` - "aspect ratio = 1:1" - when plotting (properly projected) movement data!*
+]
+
+---
+
+
+## Obtaining summary statistics
+
+Obtain lengths of vectors:
+
+```
+## [1] 3.000000 5.000000 2.828427
+```
+Obtain orientation of vectors:
+
+```
+## [1] 0.0000000 0.6435011 2.3561945
+```
+Note, the orientations are in radians, i.e. range from `\(0\)` to `\(2\pi\)` going **counter-clockwise** from the `\(x\)`-axis.  Compass directions go from 0 to 360  **clockwise**, so, to convert:
+
+```
+## [1]  90.0000  53.1301 -45.0000
+```
+
+
+---
+
+## Lets play with a trajectory
+
+Quick code for a correlated random walk:
+&lt;center&gt;
+![](ComplexNumbers_files/figure-html/SRW-1.png)&lt;!-- --&gt;
+
+---
+
+## Instant summary statistics of a trajectory:
+
+The average location
+
+```
+## [1] -10.02698-8.33157i
+```
+
+The step vectors:
+
+.center[
+![](ComplexNumbers_files/figure-html/unnamed-chunk-7-1.png)&lt;!-- --&gt;
+]
+
+
+---
+
+
+## Distribution of step lengths
+
+.center[
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##  0.1938  1.1594  1.7890  1.7538  2.3261  3.8152
+```
+
+![](ComplexNumbers_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+]
+
+
+
+---
+
+
+## What about angles?
+
+.pull-left[
+- The absolute orientations:
+
+
+```r
+Phi &lt;- Arg(dZ)
+hist(Phi, col="grey", bor="darkgrey", freq=FALSE, breaks=seq(-pi,pi,pi/3))
+```
+
+![](ComplexNumbers_files/figure-html/unnamed-chunk-9-1.png)&lt;!-- --&gt;
+]
+
+.pull-right[
+
+- Turning angles
+
+```r
+Theta &lt;- diff(Phi)
+hist(Theta, col="grey", bor="darkgrey", freq=FALSE)
+```
+
+![](ComplexNumbers_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
+
+**&lt;font color="blue"&gt; QUESTION: What is a problem with this histogram?&lt;/font&gt;**
+]
+
+---
+
+## Circular statistics
+
+Angles are a **wrapped continuous variable**, i.e. `\(180^o &gt; 0^o = 360^o &lt; 180^o\)`. The best way to visualize the distribution of wrapped variables is with **Rose-Diagrams**.  An R package that deals with circular data is `circular`. 
+
+.center[
+
+```r
+require(circular)
+Theta &lt;- as.circular(Theta)
+Phi &lt;- as.circular(Phi)
+rose.diag(Phi, bins=16, col="grey", prop=2, main=expression(Phi))
+rose.diag(Theta, bins=16, col="grey", prop=2, main=expression(Theta))
+```
+
+![](ComplexNumbers_files/figure-html/unnamed-chunk-11-1.png)&lt;!-- --&gt;
+]
+
+---
+
+## LAB EXERCISE
+
+.large[
+&gt; 1. Load movement data of choice!
+&gt; 2. Convert the locations to a complex variable Z.
+&gt; 3. Obtain a vector of time stamps T, draw a histogram of the time intervals. Then, ignore those differences. 
+&gt; 4. Obtain, summarize and illustrate:
+&gt;
+&gt; -  the step lengths 
+&gt; -  the absolute orientation
+&gt; -  the turning angles
+]
+
+---
+
+## Complex manipulations (are easy)
+
+.pull-left[
+Addition and subtraction of vectors: 
+
+$$ Z_1 = X_1 + i Y_1; Z_2 = X_2 + i Y_2$$
+$$ Z_1 + Z_2 = (X_1 + X_2) + i(Y_1 + Y_2)$$
+
+Useful, e.g., for shifting locations:
+
+
+```r
+plot(Z, asp=1, type="l", col="darkgrey", xlim=c(-2,2)*max(Mod(Z)))
+lines(Z - mean(Z), col=2, lwd=2)
+lines(Z + Z[length(Z)], col=3, lwd=2)
+```
+
+![](ComplexNumbers_files/figure-html/unnamed-chunk-12-1.png)&lt;!-- --&gt;
+]
+
+---
+
+## Complex manipulations (are easy)
+
+Multiplication of complex vectors
+$$ Z_1 = R_1 \exp(i \theta_1); Z_2 = R_2 \exp(i \theta_2)$$
+$$ Z_1 Z_2 = R_1 R_2 \exp(i (\theta_1 + \theta_2))$$
+
+If `\(\text{Mod}(Z_2) = 1\)`, multiplications *rotates* by `\(\text{Arg}(Z_2)\)`
+.center[
+
+
+```r
+Rot1 &lt;- complex(mod=1, arg=pi/4)
+Rot2 &lt;- complex(mod=1, arg=-pi/4)
+plot(Z, asp=1, type="l", col="darkgrey", lwd=3)
+lines(Z*Rot1, col=2, lwd=2)
+lines(Z*Rot2, col=3, lwd=2)
+```
+
+![](ComplexNumbers_files/figure-html/unnamed-chunk-13-1.png)&lt;!-- --&gt;
+]
+
+---
+
+## A colorful loop:
+
+.pull-left[
+
+]
+
+***
+
+.pull=right[
+![](ComplexNumbers_files/figure-html/SillyRainbow-1.png)&lt;!-- --&gt;
+&lt;/center&gt;
+
+
+
+I know you're thinking ...
+========================================================
+incremental: true
+&lt;br&gt;
+&lt;br&gt;
+
+&lt;center&gt;
+&gt;*"Thanks for teaching me how to make a weird swirling rainbow thing ... but why in the world would I want to shift and rotate my precious, precious data, which was just perfect the way it was?*
+
+&lt;br&gt;
+&lt;br&gt;
+&lt;br&gt;
+
+My response: **&lt;font color="darkred"&gt; Null Sets for Pseudo Absences! &lt;/font&gt;**
+&lt;/center&gt;
+
+
+
+Example with Finnish Wolves
+========================================================
+![](./images/Susi.png)
+
+In-depth summer predation study, questions related to habitat use 
+ * landscape type  - forest/bog/field
+ * linear elements  - roads/rivers/power lines, etc.
+
+***
+
+![](./images/Fig5.png)
+
+
+
+Defining Null Sets
+========================================================
+incremental: true
+
+1. Obtain all the steps and turning angles
+2. Rotate them by the orientation of the last step ($Arg(Z_1-Z_0)$)
+3. Add the rotated steps to the last step ($Z_1$)
+
+***
+
+&lt;center&gt;
+![](./images/RII.png)
+&lt;center&gt;
+
+
+
+
+Calculating Null Sets in R
+========================================================
+transition: none
+&lt;font color="red"&gt;
+1. Obtain all the steps and turning angles &lt;br&gt;
+2. Rotate them by the orientation of the last step ($Arg(Z_1-Z_0)$)
+&lt;/font&gt;
+
+
+
+***
+
+
+
+```r
+plot(c(0,RelSteps), asp=1, xlab="x", ylab="y", pch=19)
+arrows(rep(0,n-2), rep(0, n-2), Re(RelSteps), Im(RelSteps), col="darkgrey")
+```
+
+![](ComplexNumbers_files/figure-html/unnamed-chunk-16-1.png)&lt;!-- --&gt;
+&gt; Note: in practice (i.e. with tons of data), it is sufficient to randomly sample some smaller number (e.g. 30) null steps at each location.
+
+
+Fuzzy catterpillar plot
+========================================================
+
+&lt;font color="red"&gt;
+3. Add the rotated steps to the last step
+&lt;/font&gt;
+
+
+
+&lt;font color="red"&gt;
+4. Make the fuzzy catterpillar plot
+&lt;/font&gt;
+
+
+***
+
+![](ComplexNumbers_files/figure-html/unnamed-chunk-19-1.png)&lt;!-- --&gt;
+
+
+
+Using the null-set
+========================================================
+incremental: true
+left: 40% 
+
+The use of the null set is a way to test a narrower null hypothesis that accounts for auto correlation in the data.  
+
+The places the animal COULD HAVE but DID NOT go to are *pseudo-absences*, against which you can fit, e.g., logistic regression models (aka **Step-selection functions**).
+
+Or just be simple/lazy (like us) and compare observed locations with Chi-squared tests:
+
+***
+
+![](./images/SusiResults.png)
+![](./images/SusiResults2.png)
+
+
+
+
+EXERCISE: Create a fuzzy-catterpillar plot!
+========================================================
+right: 30%
+
+Use (a portion) of the data you analyzed before. 
+&lt;small&gt;
+
+&lt;/small&gt;
+
+***
+
+![](./images/PolarBearFuzzyCatterpillar.png)
+Fuzzy Polar Bear Catterpillar!
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"countIncrementalSlides": false,
+"highlightLines": true,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

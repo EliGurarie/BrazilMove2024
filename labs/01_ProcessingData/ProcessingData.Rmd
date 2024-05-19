@@ -1,0 +1,393 @@
+---
+title: "Preliminary Processing of Movement Data: An example with Short-Toed Eagles <br> <font size = 5> BrazilMove 2024</font>"
+author: "Elie Gurarie"
+date: "May 2024"
+output: 
+  html_document:
+    theme: simplex
+    toc: true
+    number_sections: true
+---
+
+```{r, include=FALSE, eval=FALSE}
+#setwd("./Box Sync/teaching/AukeBay Movement/Day1/")
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE)
+```
+
+# Preamble
+
+Processing data is the least loved and often most time consuming aspect of any data analysis. It is also unavoidable and extremely important. There are several tools - including some more recent R packages that greatly facilitate the processing of data.  
+
+Some goals of smart data processing include:
+
+- **compartamentalized** - e.g. each step a function
+- **interactive** - leverage visualization and interactive tools
+- **generalizable** - to apply to multiple individuals
+- **replicable** - *important: NEVER overwrite the raw data!*
+- **well-documented** - so you don't have to remember what you did
+- **forgettable!** - so once its done you don't need to think about it any more
+
+## Packages and functions
+
+Several packages are particularly useful for data processing:
+
+- `plyr` - manipulating data frames and lists
+-- functions: `mutate`; `ddply`-`ldply`-`dlply`
+- `lubridate` - manipulating time objects
+-  `sf` - projecting coordinates
+-  `maps` and `mapdata` - quick and easy maps
+-   `magrittr` - for *piping*
+
+<font color = "darkblue"> **Sneaky R trick**: For loading a lot of packages - makes a list:
+```{r}
+pcks <- list('plyr', 'lubridate', 'ggmap', 'maptools', 'sf', 'maps', 'mapdata')
+```
+and then "apply" the `require` function to the list:
+```{r, message=FALSE}
+sapply(pcks, require, character = TRUE)
+```
+</font>
+
+# Loading Data
+
+Probably the ideal format (in practice) for loading data in R is a comma-separated vector `.csv` - these are lightweight (all text) files that can be opened in Excel - or, conversely, outputted from Excel - and the function that reads them in to R `read.csv()` is generally unfussy (though in many countries, commas serve as decimal points and semi-colons are delimiters - which can cause great confusion).
+
+In the real world, however, raw data doesn't always conform with those ideals.  We're going to look at some tricks that will let us load, reformat, clean, and tidy data efficiently and consistently in R, using some short-toed eagles - a European/African species of lizard and snake eating eagle - as an example.  
+
+The data were collected by Dr. Ugo Mellone and colleagus at the University of Alicante in Spain. 
+
+Here are the first few rows of one of the files:
+
+```
+Date	Time	Latitude(N)	Longitude(E)	Speed	Course	Altitude(m)
+2010-07-19	15:00	 40.35500	  18.17217	  0	272	 103
+2010-07-19	16:00	 40.35467	  18.17233	  0	329	  95
+2010-07-19	17:00	 40.35483	  18.17233	  0	246	  90
+2010-08-09	07:00	  0.00000	   0.00000	  0	124	  27
+2010-08-09	09:00	  0.00000	   0.00000	  0	 92	  27
+2010-08-09	11:00	  0.00000	   0.00000	  0	 96	  27
+2010-08-14	13:00	 40.56167	  16.18200	  0	126	 591  
+```
+
+These data are tab-separated, rather than comma separated.  So the `read.csv` command will not work, but the more general `read.table` function handles that with the `\t` separator (remember to include the `header=TRUE`).  
+
+```{r}
+eagle <- read.table("./data/eagle.txt", sep="\t", header=TRUE)
+head(eagle)
+```
+
+The `str` ("structure") command is often the most useful for immediately getting a sense of the data: 
+
+```{r}
+str(eagle)
+``` 
+These data are - actually - relatively clean.  For example, the Latitudes and Longitudes are numeric - which is already something.   But there is almost NO dataset that doesn't need *some* processing at some point.
+
+## Basic processing of data
+
+## Changing column names
+The key location columns are those that contain latitude and longitude, which are currently named `r names(eagle)[grep("L",names(eagle))]`. The parentheses in the original column headers (which are invalid for column names for R objects) have been replaced with "."  In any case, we don't really need the ".N." and ".E."  Let's use the `rename` function in the `plyr` package to fix that:
+
+```{r}
+require(plyr)
+eagle2 <- rename(eagle, c("Latitude.N." = "Latitude", 
+                         "Longitude.E." = "Longitude",
+                         "Altitude.m." = "Altitude"))
+```
+
+Note - it's bad form to be renaming objects the same name as before, which is why I called this `eagle2`.  It's also not great form to have a whole bunch of `eagle`1-2-3's, because that's confusing.  We'll see later how to combine all the data processing into a single command. 
+
+## Removing errors
+
+Let's just do the most straightforward plot of the Long-Lat:
+```{r, fig.width = 4}
+plot(eagle2$Longitude, eagle2$Latitude, type="o")
+```
+
+<font color = "darkblue"> **R-minder:**  you can also do the same plot by either calling `plot` within the "environment" of the data frame:
+```{r, eval=FALSE}
+with(eagle2, plot(Longitude, Latitude, type="o"))
+```
+or by passing the two columns within the call:
+```{r, eval=FALSE}
+plot(eagle2[,c("Longitude","Latitude")], type="o")
+```
+
+The former, in particular, is handy as you can have a whole sequence of commands inside the `with` command and only actually refer to the eagle once. 
+</font>
+
+There's a nice, long migration here, but clearly also some screwy things! It looks like some of the errors are related to zeros ... lets count those:
+
+```{r}
+with(eagle2, table(Longitude==0, Latitude==0))
+```
+
+Yikes! 126 of them.  At least there are (apparently) no "true" 0's. Eliminating these points, the plot looks like this:
+
+```{r, fig.width = 4}
+with(subset(eagle2, Longitude != 0), plot(Longitude, Latitude, type="o"))
+```
+
+We have a choice now in our clean-up:  Do we completely remove the rows where Lat-Long = 0 or do we leave them in there as NA's?   As a general principle, it is better not to remove data, especially because there are other columns in there that contain potentially important information (e.g. Altitude).   
+
+```{r}
+eagle3 <- eagle2
+eagle3$Longitude[eagle3$Longitude == 0] <- NA
+eagle3$Latitude[eagle3$Latitude == 0] <- NA
+```
+
+<font color = "darkblue"> **Sneaky R tricks:**  Replacing values within a vector within a data frame can  often be tedious in R. We can combine the above into one command using named references:
+```{r}
+eagle3[eagle2$Longitude == 0, c("Longitude","Latitude")] <- NA
+```
+There is also a `replace` command (in base R), that operates on vectors.  For example:
+```{r}
+l <- replace(eagle2$Longitude, eagle2$Longitude == 0, "Hello!")
+head(l)
+```
+This command can be leveraged nicely with the  `mutate` function (in `plyr`) which is super useful for editing columns in a data frame:
+```{r}
+e <- mutate(eagle2, Longitude = replace(Longitude, Longitude == 0, "or me"),
+               Latitude = replace(Latitude, Latitude == 0, "not me"))
+head(e)
+```
+Or - you can make a custom function that does exactly what you want:
+```{r}
+fixme <- function(x, v1 = 0, v2 = NA){ x[x==v1] <- v2; x}
+e <- mutate(eagle2, Longitude = fixme(Longitude), 
+                    Latitude = fixme(Latitude))
+head(e)
+```
+This last approach is most useful if you have some complicated fixits that you're after.  Just remember - you still always have to assign the output of `mutate`.  
+</font>
+
+But we still have at least one truly obvious and inexplicable outlier. How do we find it?  We could identify it directly just by looking at the coordinates:
+
+```{r}
+which(eagle3$Longitude < -60)
+```
+
+Yikes! Looks like a bunch of them, and all near the end.  Let's replace those as well and plot the final result:
+
+```{r, fig.width = 3}
+eagle4 <- mutate(eagle3, 
+               Longitude = replace(Longitude, Longitude < -60, NA),
+               Latitude = replace(Latitude, is.na(Longitude), NA))
+
+with(subset(eagle4, !is.na(Longitude)), plot(Longitude, Latitude, type="o"))
+```
+
+Ok, looks pretty clean!  There's still one funny looking outlier at the very bottom.  But is it is really a mistake?  How would you find out?
+
+Now - shockingly - we'll violate two of our new rules.  First - we'll throw out all the rows with NA's - to simplify our lives down the road.  Second - we'll rename the new clean file `eagle` again.  
+
+```{r}
+eagle <- subset(eagle4, !is.na(Longitude))
+```
+
+## Dates and Times
+
+One of the scourges of movement data is dates and times, which are complicated and poorly stacked for a whole bunch of reasons related to inconsistent formatting, days and weeks and months not dividing nicely into years, etc. 
+
+When you read data in using `read.table`, all character strings are automatically "factors".  A standard universal date format for data is called `POSIX`.  You used to have to muck around with the `as.POSIX` commands in R which could be quite clunky, e.g.:
+```{r}
+head(as.POSIXlt(paste(eagle$Date, eagle$Time), format = "%Y-%m-%d %H:%M", tz = "UTC"))
+```
+The `lubridate` package can generate these objects much more quickly, without specifying the formatting.  The functions `ymd` and `hm` below "intelligently" decifer the year-month-day and hour-minute formatting of the data. 
+
+```{r, message = FALSE}
+require(lubridate)
+head(ymd(eagle$Date) + hm(eagle$Time))
+```
+Slick, right!  In our data, the format was at least the (very sensible) YYYY-MM-DD. In the US very often dates are written down as MM/DD/YYYY (and, infuriatingly, always saved that way by Excel). For `lubridate` ... no problem:
+
+```{r}
+dates <- c("5/7/1976", "10-24:1979", "1.1.2000")
+mdy(dates)
+```
+
+Again, lets `mutate` the data, adding a true "Time" column:
+
+```{r}
+eagle <- mutate(eagle, Date = ymd(Date), Time = hm(Time), DateTime = Date+Time)
+head(eagle)
+```
+
+One other nice feature of `lubridate` is the ease of getting days of year, hour or days, etc. from data, e.g.:
+```{r}
+hour(eagle$DateTime)[1:10]
+month(eagle$DateTime)[1:10]
+yday(eagle$DateTime)[1:10]
+```
+
+It is often very useful to simply plot the Time:
+
+```{r, echo=-1}
+par(bty="l")
+plot(eagle$DateTime, type="o", pch=19, col=rgb(0,0,0,.3), cex=0.5)
+```
+
+You can see when the gaps occurred, and when the GPS collar had the biggest problems, how the data acquisition was distributed.  
+
+## A sneak peak into maps
+
+We'll get into fancier visualizations later, but for a long ranging migrant like this one, it might be nice just to see where this bird is going on a globe.  This can be done in two lines using the `maps` and `mapdata` packages:
+
+```{r, message=FALSE, fig.height=6, fig.width = 4}
+require(mapdata) # also loads maps
+map("world", xlim = c(-20,30), ylim = c(5,55), fill=TRUE, col="grey", bor=NA)
+with(eagle, lines(Longitude, Latitude, pch=19, type="o", col=rgb(0,0,1,.3), cex=0.5))
+box()
+```
+
+An impressive migration from Italy across southern France and Spain to the Sahel. 
+
+## Latitudes and longitudes
+
+It is nice to have Lat-Long data for seeing where your data are located in the world. But degrees latitude and longitude are not of consistent size, and movement statistics are best used in a consistent format, with "real" distances between points - whether in kilometers or meters.  
+
+### ...into UTM
+
+One  widely used type of projection for this purpose is "Universal transverse mercator" which will transform your data to meters north and east of one of 60 points at 6 degree intervals around the equator.   One function that does this is `convUL` in `PBSmapping`.  Its a bit awkward to use, as the data have to have columns names "X" and "Y" and have an "attribute" called "" "LL" so that it knows that its converting from a lat-long:
+
+```{r, message=FALSE, warning=FALSE}
+require(PBSmapping)
+ll <- with(eagle, data.frame(X = Longitude, Y = Latitude))
+attributes(ll)$projection <- "LL"
+xy <- convUL(ll, km=TRUE)
+plot(xy, asp=1, type="o")
+```
+
+Note that the function determined that the best zone for these data would be zone `r attributes(xy)$zone`.  That is an easy variable to change.  Note that we can now say that the total extent of the eagles migration was: 
+```{r}
+diff(range(xy$X))
+diff(range(xy$Y))
+```
+
+So over 3700 km north-south, and 2000 km east-west.  
+
+### ... proj4
+
+A more comprehensive projection standard is the "PROJ4" system, which GIS users should be aware of.  In particular when you are working with spatial files from other sources (e.g. habitat layers, bathymetry models), you need to make sure that your coordinates match up!  From this repository: https://epsg.io/32629 we can identify a good projection as `+proj=utm +zone=31 +datum=WGS84 +units=m +no_defs`
+```{r warning=FALSE, message=FALSE}
+require(rgdal)
+XY <- project(as.matrix(eagle[,c("Longitude", "Latitude")]),"+proj=utm +zone=31 +datum=WGS84 +units=m +no_defs")
+```
+
+For an eagle moving on such a large scale, the differences will be very minor.  How would you compare those differences?  
+
+# Combining ALL the processing into one step
+
+Usually, there is more than one individual that data have been collected on, and all of those preprocessing steps need to be applied to all of them.  To avoid too much copying / pasting and consequent error introduction, it is best to write a single function that performs all these steps at once.   
+
+Note, in the function below, that all of the mutate commands can be combined in one command:
+
+```{r ClearEagleData}
+getUTM <- function(lon, lat){
+  xy <- project(cbind(lon, lat), "+proj=utm +zone=31 +datum=WGS84 +units=m +no_defs")
+  colnames(xy) <- c("X", "Y")
+  return(xy/1000)}
+
+cleanEagleData <- function(e){
+  e <- rename(e, c("Latitude.N." = "Latitude", 
+                         "Longitude.E." = "Longitude",
+                         "Altitude.m." = "Altitude"))  
+  e <- mutate(e,
+              Longitude = replace(Longitude, Longitude == 0 | Longitude < -60, NA),
+              Latitude = replace(Latitude, is.na(Longitude), NA),
+              Date = ymd(Date), Time = hour(hm(Time)), DateTime = Date+Time)
+  e <- data.frame(e, getUTM(e$Longitude, e$Latitude))
+  return(e)
+}
+e <- cleanEagleData(read.table("./data/eagle.txt", sep="\t", header=TRUE))  
+```
+
+<font color = "darkblue">**Super sneaky R trick**:  There's a funky technique called "piping" in the package `magrittr` which allows you do  many steps as a single step.  Check out examples and documentation, but in the meantime, compare the code below with the code above:
+```{r, message=FALSE}
+require(magrittr)
+cleanEagleData <- function(e){
+  mutate(e, Date = ymd(Date), Time = hour(hm(Time)), DateTime = Date + Time) %>%
+  rename(c("Latitude.N."="Latitude", "Longitude.E."="Longitude", "Altitude.m." = "Altitude"))  %>% 
+  mutate(Longitude = replace(Longitude, Longitude == 0 | Longitude < -60, NA),
+             Latitude = replace(Latitude, is.na(Longitude), NA)) %>% 
+  data.frame(getUTM(e$Longitude, e$Latitude))
+}
+```
+</font>
+
+## Loading multiple data sets
+
+There are several eagle datasets collected into the `./data/eagles/` folder.  They have awkward names and it would be nice to automate loading all of those data.
+
+You can access file lists from within R:
+```{r}
+list.files("./data/eagles")
+```
+If we save this list of files, we can automate the entire procedure.  There are a few options 
+
+```{r, message=FALSE}
+directory <- "./data/eagles/"
+files <- list.files(directory)
+Eagles <- list()
+for(i in 1:length(files)){
+  myfile <- files[i]
+  mydata <- data.frame(ID = myfile, 
+                       read.table(paste0(directory, myfile), sep="\t", header=TRUE))
+  Eagles[[myfile]] <- cleanEagleData(mydata)
+}
+```
+
+Note how we were able to add items to the list named by the file name:
+```{r}
+names(Eagles)
+```
+Are you annoyed by the '.txt''s?  Good.  Because so am I:
+```{r}
+names(Eagles) <- substr(files, 1, regexpr("[.]", files)-1)
+names(Eagles)
+Eagles <- lapply(Eagles, function(e){ 
+    e$ID <- substr(e$ID, 1, regexpr("[.]", files)-1)
+    return(e)})
+```
+
+## Working with the list
+
+Notice, that this loop placed all of the eagles into a single object - a list.  This can be handy - later - for applying functions that summarize all of the data.  Again, the `plyr` package comes in handy  Its `ldply` function takes a list (the `l`), applies functions to each element of the list and returns a data frame (the `d`).  We'll be doing lots of this later, but here's a quick example:
+
+```{r}
+ldply(Eagles, summarize, n.loc = length(X), 
+      X.range = diff(range(X))/1000, 
+      Y.range = diff(range(Y))/1000,
+      T.start = min(Date),
+      T.end = max(Date))
+```
+
+Incidentally, if you want to just collapse the whole list into a data frame:
+
+```{r}
+Eagles.df <- ldply(Eagles)
+str(Eagles.df)
+```
+Note that `.id` becomes the default name for the eagle ID's. 
+
+# Saving Data
+
+The most efficient way to *save* the processed data - which is formatted correctly, and is a list which does not lend itself automatically to being a table (though see above), is to use the all powerful save command:
+
+```{r, eval=FALSE}
+save(Eagles, file = "Eagles.rda")
+```
+
+Next time you fire up your R for analysis, you can forget everything we did up here and just load the file:
+
+```{r, eval=FALSE}
+load(file = "Eagles.rda")
+```
+
+So useful!  Grab that data like that eagle grabs snakes. 
+
+<center>
+![](shorttoedeagle.jpg)
+</center>
