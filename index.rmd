@@ -78,8 +78,9 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 **Topic: Processing Movement Data**
 
 - [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
-- [Lab](Day1/02_ProcessingData/PreliminaryProcessing.html)
-
+- [R Lab](Day1/02_ProcessingData/Lab1_DataProcessing.html)
+  - data here: [Elk_GPS_data.csv](data/Elk_GPS_data.csv) (right-click to download)
+  
 #### Afternoon: Summarizing and Visualizing
 
 **Topic: Visualizing Movement Data**
