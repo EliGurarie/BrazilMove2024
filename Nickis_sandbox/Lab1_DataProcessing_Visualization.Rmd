@@ -60,8 +60,11 @@ Excel loves to mess up date/time information, so be sure to check that your date
 
 The file path should correspond to wherever you saved your CSV file on your computer.
 
+*Note*: It is helpful to first set your working directory (`setwd`), so that you don't have to call the entire file every time.
+
+
 ```{r}
-elk_gps <- read.csv("./BrazilMove2024/data/Elk_GPS_data.csv")
+elk_gps <- read.csv("./data/Elk_GPS_data.csv")
 
 str(elk_gps)
 ```
@@ -99,21 +102,30 @@ library(move)
 
 You will need to make a Movebank account and login first, using the `movebankLogin` function.
 
-```{r}
+```{r eval = FALSE}
 mylogin <- movebankLogin(username = 'YourUsername', password = 'yourpassword')
 ```
 
-```{r include=FALSE}
+```{r include=FALSE, eval = FALSE}
 mylogin <- movebankLogin(username = 'NickiB', password = 'Ne*5ne@ZrfT5QtS')
 ```
 
 Now you can use your login information object within the `getMovebankData` function to access the study you are interested in. 
 
-Let's access the [Elk Movebank Dataset](https://www.movebank.org/cms/webapp?gwt_fragment=page=studies,path=study72264071).
+Let's access one of the [Elk Movebank Datasets](https://www.movebank.org/cms/webapp?gwt_fragment=page=studies,path=study897981076).
 
-```{r}
-elk_move <- getMovebankData(study = "Ya Ha Tinda elk project, Banff National Park (data from Hebblewhite et al. 2008)", login = mylogin, removeDuplicatedTimestamps=TRUE)
+*IMPORTANT* - you first need to go the study page on Movebank, log in with your credentials, and under the "Download" tab, click "Download Data" and then agree to the license agreement. You can now download the data on the web to your computer OR use the function below to download the data.
+
+```{r eval=FALSE}
+elk_move <- getMovebankData(study = "Ya Ha Tinda elk project, Banff National Park, 2001-2023 (females)", login = mylogin, removeDuplicatedTimestamps=TRUE)
 ```
+
+```{r include=FALSE}
+#save(elk_move, file="./data/elk_move.rda")
+
+load(file="./data/elk_move.rda")
+```
+
 
 ```{r}
 head(elk_move)
@@ -121,7 +133,14 @@ head(elk_move)
 
 The `getMovebankData` function will result in a "MoveStack" object, which is specially formatted for the "move" package functions.
 
-We can convert it to a basic R data frame object using the 
+We can do a quick plot of the elk locations in this dataset using the `plot` function on our MoveStack object.
+
+```{r}
+plot(elk_move)
+```
+
+
+We can convert it to a basic R data frame object using the `as.data.frame` function.
 
 ```{r}
 elk_df <- as.data.frame(elk_move)
@@ -131,33 +150,41 @@ str(elk_df)
 
 ## Data Processing Steps
 
-Processing data will always be specific to your data and needs. Sometimes it can be helpful to do some processing and data cleaning outside of R (e.g., within Excel). It can be helpful to diagram or write out your data processing needs BEFORE trying to draft your code.
+Processing data will always be specific to your data and needs. Sometimes it can be helpful to do some processing and data cleaning outside of R (e.g., within Excel, especially for datetime information). 
 
-But generally, R is a powerful tool for quick, efficient, and reproducible data processing and cleaning. If there is ever something you don't know how to do in R, a quick Google search or taking a look at one of the many R resources online (e.g., [R-Bloggers](https://www.r-bloggers.com/) or [Stack Overflow](https://stackoverflow.com/)).
+You find it useful to diagram or write out your data processing needs BEFORE trying to draft your code.
+
+R is a powerful tool for quick, efficient, and reproducible data processing and cleaning. If there is ever something you don't know how to do in R, a quick Google search or taking a look at one of the many R resources online (e.g., [R-Bloggers](https://www.r-bloggers.com/) or [Stack Overflow](https://stackoverflow.com/)) will likely eventually result in a solution.
 
 ### Step 1: Re-Name or Drop Columns
 
-The "[]" operator can be used to grab specific columns their number in a dataframe.
+The "[]" operator can be used to grab specific columns by their number in a dataframe.
 
 Let's drop the 4th and 5th columns from our "elk_gps" dataset.
 
 ```{r}
 elk_gps <- elk_gps[, -c(4:5)]
+
+str(elk_gps)
 ```
 
-Columns can be renamed using the `names` Base R function anf a vector of the names you want, as text and in the order you want.
+Columns can be renamed using the `names` Base R function and a vector of the names you want, as text (character format) and in the order you want.
 
 Let's rename our columns to "datetime", "lon", "lat", and "id".
 
+Note the structure of your data as well. R has many different data structures but the main ones you will use are numeric, character (factor is similar but has levels), Posixct, and spatial. We will
+
 ```{r}
 names(elk_gps) <- c("datetime", "lon", "lat", "id")
+
+str(elk_gps)
 ```
 
 ### Step 2: Convert DateTime Column to Posixct Format
 
-R reads datetime data in a particular way. Converting your datetime column to "Posixct" format will ensure that R reads that column as a datetime information, not just a character.
+R reads datetime data in a particular way. Converting your datetime column to "POSIXct" format will ensure that R reads that column as a datetime information, not just a character or text.
 
-To format a column to be "Posixct" format, you can use the `as.POSIXct` function. 
+To format a column to be "POSIXt" format, you can use the `as.POSIXct` function. 
 
 Here, you need to be careful to specify the format of the datetime column **exactly** as it is, using Posixct syntax (eg, "%m" for month, "%d" for day, "%Y" for year, "%H" for hours, "%M" for minutes, and "%S" for seconds).
 
@@ -167,6 +194,7 @@ Let's check the format of our datetime column:
 elk_gps$datetime[1]
 ```
 
+Now we specify this format with POSIXct syntax in the "format" argument of the `as.POSIXct` function. 
 
 ```{r}
 elk_gps$datetime <- as.POSIXct(elk_gps$datetime, format="%m/%d/%Y %H:%M:%S")
@@ -174,21 +202,37 @@ elk_gps$datetime <- as.POSIXct(elk_gps$datetime, format="%m/%d/%Y %H:%M:%S")
 str(elk_gps)
 ```
 
+Now that our datetime column is in POSIXct format, we can perform mathemetical operations on this column and return the results in units of time.
+
+```{r}
+elk_gps$datetime[2] - elk_gps$datetime[1]
+```
+
+For example, we can use the `difftime` function to take the difference in time between our first and second observations in the datetime column, specifying the desired units for the output:
+
+
+```{r}
+difftime(elk_gps$datetime[2] , elk_gps$datetime[1], units = "mins")
+```
+
+
 ### Step 3: Check for Missing Data
 
-R stores missing values as "NA". 
+R stores missing values as "NA" (or sometimes, "NaN"). 
 
 You can check for NA values in a vector or column using the `is.na` function, which handily will return a vector the same length, with TRUE where there are NA's and FALSE where there are not NA's.
 
-Let's use the `subset` Base R function to select only the rows in our elk data where there are no NA's for datetime, lat, or lon. 
+Let's use the `subset` Base R function to select only the rows in our elk data where there are *no NA's* for datetime, lat, and lon. 
 
 ```{r}
 elk_gps2 <- subset(elk_gps, is.na(datetime)==FALSE & is.na(lon)==FALSE & is.na(lat)==FALSE)
+
+str(elk_gps2)
 ```
 
 ### Step 4: Check for Duplicate Data, Sort By Time
 
-Duplicated data can falsely inflate your data and result in conflicts with various functions.
+Duplicated data can falsely inflate your data with observations and result in conflicts with various functions used for analyses later.
 
 We will use the "dplyr" R package for more data organizing and cleaning. 
 
@@ -199,7 +243,9 @@ library(dplyr)
 
 We will use the "|>" native R pipe to efficiently run multiple functions at once on an object.
 
-Before filtering out duplicate datetime data and sorting our data, we first need to group the data by each individual in our dataset (our "id" column) so that the functions are applied to each individual separately.
+Before filtering out duplicate datetime data (using the `filter` function to select the rows that are not duplicated, using the "!" condition) and sorting our data by datetime information (using the `arrange` function, which automatically sorts in increasing order), we first need to group the data by each individual in our dataset (our "id" column) so that the functions are applied to each individual separately.
+
+We then `ungroup` our data to combine the results among all individuals and use the `data.frame` function to ensure the resulting object is a dataframe structure.
 
 
 ```{r}
@@ -215,17 +261,21 @@ head(elk_gps3)
 
 ### Step 5: Make Data Spatial 
 
-Spatial data in R comes in multiple formats (vectors, e.g. points, lines, and polygons, or rasters). 
+Spatial data in R comes in multiple formats (vectors, e.g. points, lines, and polygons, or rasters). You may find the online resource [Spatial Data Science with R and “terra”](https://rspatial.org/) helpful for further information.
 
-There are multiple packages in R for formatting spatial data but a fan favorite is the "sf" package. 
+There are multiple packages in R for formatting spatial data but a fan favorite for vector data is the "sf" package. 
+
+Raster data can be processed using the "raster" package or more recently, the "terra" package.
 
 ```{r}
 library(sf)
 ```
 
-If you have spatial data stored as shapefiles or rasters, these can be read in with the "sf" package (vectors) or the "raster" package. We won't cover that in this lab but we will cover some of this in the RSF/SSF lab.
+If you are working with movement/tracking data, you should have columns with geographic coordinate information for each observation in the dataset, with this information often being stored in latitude/longitude format (units: angular decimal degrees).
 
-For now, we can convert our data to "sf" format, using the `st_as_sf` function, specifying the columns with our coordinate information (latitude first, then longitude) and the Coordinate Reference System EPSG code (4326 corresponds to WGS 1984, a Geographic Coordinate System for data with coordinates in units of decimal degrees).
+Let's convert our elk data to "sf" format, using the `st_as_sf` function, specifying the columns with our coordinate information (latitude first, then longitude) and the Coordinate Reference System EPSG code (*4326* corresponds to WGS 1984, a Geographic Coordinate System for data with coordinates in units of decimal degrees).
+
+Our new sf object is a "POINt" vector type, with each location/observation in the data having a corresponding POINT geometry. The sf package has many amazing functions to manipulate spatial data, including spatial operations and conversion to different vector types.
 
 ```{r}
 elk_sf <- elk_gps3 |>
@@ -239,7 +289,7 @@ elk_sf
 
 Visualizing data is an important step in the data processing and analysis stages.
 
-Learning how to visualize your data correctly can help you catch errors in your code, outliers in your data, and observe interesting patterns that will inform your analysis choices.
+Learning how to visualize your data correctly can help you catch errors in your code, outliers in your data, and interesting patterns that will inform your analysis choices.
 
 Visualization can be done with Base R plotting or the "ggplot2" R package, which is excellent for creating complex plots in one line of code.
 
@@ -251,31 +301,76 @@ library(ggplot2)
 
 ### Base R
 
-```{r}
-layout(cbind(c(1,1),2:3))
-par(bty = "l", mar = c(2,2,2,2))
+We can use base R to specify a "fancy" plot showing each of our tracks in multiple dimensions, including latitude/longitiude, latitude versus time, and longitude versus time.
 
-with(elk_gps3, {
-  plot(X, Y, asp =1, col = c("orange","blue")[state], pch = 19, cex = 0.7)
-  segments(X[-length(X)], Y[-length(Y)], 
-           X[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
-  plot(date, X, col = c("orange","blue")[state], pch = 19, cex = 0.7)
-  segments(date[-length(X)], Y[-length(Y)], 
-           date[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
-  plot(date, Y, col = c("orange","blue")[state], pch = 19, cex = 0.7)
-  segments(date[-length(X)], Y[-length(Y)], 
-           date[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
-})
+Note that using a geographic coordinate system (GCS) with units in angular degrees (lat/lon) can be useful for mapping and observing patterns in the data but that direct, measurable comparisons can only be made with a projected coordinate system (PCS), where the units are in measurable units (e.g., meters). We will demonstrate how to work with projected coordinates in the next lab.
+
+*Note*: You may find this online resource on [Plotting with Base R](https://bookdown.org/rdpeng/exdata/the-base-plotting-system-1.html) useful if you are unfamiliar with the `plot` function and its various arguments.
+
+Let's make a base R plot of the track for the individual, "GP1"
+
+```{r }
+
+GP1 <- subset(elk_gps3, id == "GP1")
+
+par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+layout(rbind(c(1,2), c(1,3)))
+plot(GP1$lon, GP1$lat, asp = 1, type="o", ylab="Latitude", xlab="Longitude")
+plot(GP1$datetime, GP1$lon, type="o", xaxt="n", ylab="Longitude", xlab="")
+plot(GP1$datetime, GP1$lat, type="o", ylab="Latitude", xlab="Datetime")
+title(paste("ID", GP1$id[1]), outer = TRUE)
 ```
+
+We can also write our own little function, using the `function` function, to apply this plot to all individuals at once.
+
+For more information/help on writing functions in R, check out this helpful online resource, [Writing Functions in R](https://dept.stat.lsa.umich.edu/~jerrick/courses/stat701/notes/functions.html).
+
+```{r}
+plotTrack_latlon <- function(dataframe){
+  par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+  layout(rbind(c(1,2), c(1,3)))
+  plot(dataframe$lon, dataframe$lat, asp = 1, type="o", ylab="Latitude", xlab="Longitude")
+  plot(dataframe$datetime, dataframe$lon, type="o", xaxt="n", ylab="Longitude", xlab="")
+  plot(dataframe$datetime, dataframe$lat, type="o", ylab="Latitude", xlab="Datetime")
+  title(paste("ID", dataframe$id[1]), outer = TRUE)
+}
+```
+
+
+We can use the "plyr" package with the `d_ply` function to apply our new function grouped by a variable of interest, here each individual. This function will simply return the output of the function used (see also `ddply`, which we will use later to return a dataframe based on a function's output).
+
+*Note*: plyr and dplyr do not "play nice" with each other. You need to load the dplyr package AFTER the plyr package to avoid conflicts and function masking. We can use the `detach` function to unload our dplyr package, then use the `library` function to load the plyr and dplyr packages, consecutively. If you see that a particular function is "masked" you can use the package name and ":" before the name of a particular function from a particular package to ensure that masking (which happens when you have functions of the same name in two packages that are loaded) does not occur (e.g., `dplyr::select()`).
+
+```{r}
+detach("package:dplyr", unload=TRUE)
+
+library(plyr)
+
+library(dplyr)
+```
+
+
+
+```{r}
+elk_gps3 |> d_ply("id", plotTrack_latlon)
+
+```
+
 
 ### ggplot
 
-The `ggplot` function takes arguments for the data object to be plotted, the x and y axis variables to be plotted (within the `aes()` function), additional aesthetic arguments (e.g., color or linewidth), and additive functions that define the plot type.
+The `ggplot` function takes arguments for the data object to be plotted, the x and y axis variables to be plotted (within the `aes()` function), a variety of additional aesthetic arguments (e.g., color or linewidth), and additive functions that define the plot type.
+
+```{r}
+library(ggplot2)
+```
+
+
+For more help with plotting with ggplot, check out this helpful online resource, [ggplot2 with the tidyverse](https://ggplot2.tidyverse.org/).
 
 Let's make a plot for the elk individual "GP1", using latitude for the X axis, longitude for the y-axis, and using points and a connecting "path" between points to plot the track.
 
 ```{r}
-GP1 <- subset(elk_gps3, id=="GP1")
 
 ggplot(data = GP1, aes(x = lon, y = lat)) +
   geom_point()+
@@ -283,10 +378,10 @@ ggplot(data = GP1, aes(x = lon, y = lat)) +
   theme_classic()
 ```
 
-Now let's visualize all individuals at once, using the additional `facet_wrap` function to facet or group our plots by each elk id. 
+Now let's visualize all individuals at once, using the additional `facet_wrap` function to facet or group our plots by each elk id. The "scale = 'free' " argument allows each plot to have its own intuitive x and y axis limits ("scale='fixed' does the opposite).
 
 ```{r fig.height=20, fig.width=9}
-ggplot(data=elk_gps3, aes(x = lon, y = lat)) +
+ggplot(data = elk_gps3, aes(x = lon, y = lat)) +
   geom_path(size = 0.5, color = "darkgrey") +
   geom_point() +
   theme_classic() +
@@ -294,11 +389,14 @@ ggplot(data=elk_gps3, aes(x = lon, y = lat)) +
 
 ```
 
-Another useful plot is latitude versus datetime. This can be especially helpful for identifying migrational patterns (e.g., residency vs transiting).
+We can also visualize latitude 9or longitude) versus datetime. 
+
+This can be especially helpful for identifying interesting behavioral patterns in animal movement (e.g., residency vs transiting), which can inform your choice of analysis method later on.
 
 ```{r fig.height=20, fig.width=9}
 ggplot(data = elk_gps3, aes(x = datetime, y = lat)) +
   geom_path(size = 0.5) +
+  xlab("DateTime") + ylab("Latitude") +
   theme_classic() +
   facet_wrap(~id, scale="free", ncol = 3)
 ```
@@ -309,7 +407,7 @@ ggplot(data = elk_gps3, aes(x = datetime, y = lat)) +
 
 sf objects can be plotted by their attributes using the `plot` Base R function.
 
-For example, we can plot the points (or "geometry") for the "GP1" elk from above.
+For example, we can plot the points (or "geometry", which are points) for the "GP1" elk individual, after subsetting its data from the larger "elk_sf" object we created above.
 
 ```{r}
 GP1 <- subset(elk_sf, id == "GP1")
@@ -319,24 +417,71 @@ plot(GP1$geometry, pch = 19)
 
 Without a background map, this plot is not very informative!
 
-The "mapdata" package can be useful for adding a background map to a spatial plot.
+### ggplot and ggmap
+
+The "ggmap" package works helpfully with ggplot functions and sf data to add open-source basemaps. More info on the package can be found on the [ggmap Github Repo Page](https://github.com/dkahle/ggmap).
 
 ```{r}
-library(mapdata)
+library(ggmap)
 ```
+
+Importantly, you need internet access to download the open-source base map "tiles".
+
+You also FIRST need to register for a *free API key* with Stadia Maps at their [API Signup Page](https://client.stadiamaps.com/signup/) (see `?register_stadiamaps`).
+
+After you complete your registration, go to your [client dashboard](https://client.stadiamaps.com/dashboard/?utm_source=docs&utm_content=api_key_callout#/overview) and create a new "property" (e.g., "Nicki's API"). You can now create a new API key (save this somewhere on your computer so that you can find it if needed). You can also find instructions 
+under the [Stadia API Documentation Page](https://docs.stadiamaps.com/authentication/#api-keys).
+
 
 ```{r}
-map("state", "wisconsin")
-plot(GP1$geometry, pch = 19, color="purple", add = TRUE)
+key <- "e644fe03-1f7b-4b05-87a8-c65335eb4625"
+
+register_stadiamaps(key, write = FALSE)
 ```
+
+
+Now, before creating our map, we need to define the spatial extent for the basemap, defining the extent as a "box" defined by 2 points (left, bottom and top, right).
 
 ```{r}
-wisconsin <- map_data("state", "wisconsin") |> data.frame()
+GP1_bbox <- st_bbox(GP1)
 
-wisconsin_sf <- st_as_sf(wisconsin, coords = c("long", "lat"), 4326)
+names(GP1_bbox) <- c("left","bottom","right","top")
+
+GP1_bbox
+
+GP1_box <- c(left = -115.6, bottom = 51.5, right = -115.4, top = 51.75)
+
+```
+
+We might want to add a buffer around this bbox, to have a bigger spatial extent than our points. For example, we could 5 degrees in each direction:
+
+```{r}
+GP1_bbox
 ```
 
 
+Next, we use the `get_map` function on our new bbox to grab the basemap, specifying source "stadia" to use the open source base maps. Note that there are different maptypes available, which will change the visual presentation of the basemap (see `?get_map`, we are using "stamen_terrain").
+
+```{r}
+basemap <- get_map(GP1_box,
+               source = "stadia",
+               maptype  = "stamen_terrain")
+
+```
+
+Annoyingly, defining an sf object removes the spatial columns from the data (they are stored inside an `st_geometry` column instead). We can extract each of the lat/long columns, using the `st_coordinates` function on our sf object (stored as a matrix, with long first, then lat).
+
+```{r}
+GP1$lon <- st_coordinates(GP1)[,1]
+GP1$lat <- st_coordinates(GP1)[,2]
+```
+
+
+```{r}
+ggmap(basemap, extent = "normal") +
+  geom_point(data = GP1, color="red") +
+  theme_classic()
+```
 
 
 
@@ -350,29 +495,47 @@ Note that this can be memory-intensive if you are plotting a lot of data at a hi
 library(ggspatial)
 ```
 
-The “ggspatial” R package is great for making nice maps, using Open Street Map tiles (open source).
+The “ggspatial” R package is great for maps using Open Street Map (OSM) base map tiles (open source).
 
 The `annotation_map_tile` function allows you to specify a background map type (“type=”) and zoom level (“zoom=”, where a higher zoom is a higher resolution but may take longer to render). You can run the code “rosm::osm.types” to see all the different map tile types available (we will use the “osm” one).
 
-You can also add some nice map features, such as a scale bar (function `annotation_scale()`) and a north arrow (function `annotation_north_arrow()`, with arguments for specifying height, width, padding dimensions).
+You can also add some nice map features, such as a scale bar (function `annotation_scale()`) and a north arrow (function `annotation_north_arrow()`, with arguments for specifying height, width, padding dimensions). You can also specify nicer axis labels and breaks using the `scale_y_continuous` and `scale_x_continuous` functions, specifying the
 
 You can then add on your other, regular ggplot functions, such as `geom_sf` and theme options.
 
-```{r}
-box <- st_bbox(c(xmin = -116.5, xmax = -115.3, ymax = 52.2, ymin = 51.4), crs = st_crs(4326))
+```{r }
+box <- st_bbox(c(xmin = -115.6, xmax = -115.4, ymax = 51.5, ymin = 51.75), crs = st_crs(4326))
 
 ggplot() +
-  annotation_map_tile(type = 'osm', zoom = 3) +
+  annotation_map_tile(type = 'osm', zoom = 12) +
   annotation_scale()+
   annotation_north_arrow(height=unit(0.5,"cm"), width=unit(0.5,"cm"), pad_y = unit(1,"cm"))+
-  #shadow_spatial(box)+
+  shadow_spatial(box)+
   ylab("Latitude") + xlab("Longitude")+
-  geom_sf(data=elk_sf,aes(), color="orange", size=2)+
-  #scale_y_continuous(breaks=c(43.03, 43.04, 43.05, 43.06, 43.07))+
-  #scale_x_continuous(breaks=c(-76.175, -76.165,-76.155,-76.145,-76.135))+
+  scale_y_continuous(breaks= c(51.5, 51.6, 51.7, 51.75))+
+  scale_x_continuous(breaks= c(-115.6, -115.5, -115.4))+
+  geom_sf(data=GP1,aes(), color="orange", size=2)+
   theme_classic()
 ```
 
+#### Export Static Map
+
+If you wanted to export your map, you could do so by sandwhiching your map code between the file type function you want the image to be saved as (e.g., `jpeg` or `png`) and the function `dev.off`.
+
+```{r eval = FALSE}
+jpeg(file="./GP1_Map.jpg", units="in", width=4, height=7,res=300)
+ggplot() +
+  annotation_map_tile(type = 'osm', zoom = 12) +
+  annotation_scale()+
+  annotation_north_arrow(height=unit(0.5,"cm"), width=unit(0.5,"cm"), pad_y = unit(1,"cm"))+
+  shadow_spatial(box)+
+  ylab("Latitude") + xlab("Longitude")+
+  scale_y_continuous(breaks= c(51.5, 51.6, 51.7, 51.75))+
+  scale_x_continuous(breaks= c(-115.6, -115.5, -115.4))+
+  geom_sf(data=GP1,aes(), color="orange", size=2)+
+  theme_classic()
+dev.off()
+```
 
 
 ### mapview
@@ -383,9 +546,9 @@ Interactive mapping in R with the "mapview" R package is a useful way to visuali
 library(mapview)
 ```
 
-Let's create spatial tracks of our elk data, using the sf version. 
+Let's create spatial tracks of all of our elk data, using our "elk_sf" object. 
 
-We use the `summarize` function and the `st_cast` function with the `group_by` function to create individual elk tracks.
+We use the `summarize` function and the `st_cast` function with the `group_by` function from the dplyr package to first create individual elk tracks, as LINESTRINGS.
 
 
 ```{r}
@@ -395,11 +558,15 @@ elk_tracks <- elk_sf |>
   st_cast("LINESTRING")
 ```
 
+Now we can use the `mapview` function to plot our tracks, specifying to color the tracks by different ids with the "zcol" argument. Note that the `mapview` function can plot any spatial data and has a variety of additional controls/arguments available (see [Advanced Mapview Controls](https://r-spatial.github.io/mapview/articles/mapview_02-advanced.html) for more options and examples).
+
 ```{r}
 mapview(elk_tracks, zcol="id")
 ```
 
 # Save Your Processed Data
+
+After processing your data, it is always useful to save it as an intermediate data object. Rda format is perfect for this, as it is an R specific file type that will load your saved objects directly back into your Global Environment for use.
 
 ```{r, eval=FALSE}
 elk_processed <- elk_gps3

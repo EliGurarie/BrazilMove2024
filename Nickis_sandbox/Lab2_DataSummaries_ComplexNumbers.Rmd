@@ -16,7 +16,7 @@ knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
 
 # Load In Processed Data
 
-We will load in the data we created in the previous exercise.
+We will load in the processed elk data we created in the previous exercise.
 
 ```{r}
 
@@ -45,7 +45,7 @@ elk_processed |> group_by(id) |>
             Duration = round(difftime(max(datetime), min(datetime), units = "days")))
 ```
 
-It's also helpful to use the `summary` function to summary statistics for the tracking duration of all the individuals in our dataset.
+It's also helpful to use the `summary` function to generate summary statistics for the tracking duration of *all* the individuals in our dataset.
 
 Looks like there are some very short tracks that we might want to drop!
 
@@ -75,7 +75,7 @@ ggplot(data = elk_processed, aes(x = datetime,y = id, color = id))+
 
 ## Drop Individuals with Short Tracks
 
-Using the `subset` function combine with the "%in%" operator, we can filter out the individuals we with very short tracks. 
+Using the `subset` function combine with the "%in%" operator and the "!" condition (meaning "not equal to"), we can select only for the individuals *without* very short tracks. 
 
 ```{r}
 elk_processed2 <- subset(elk_processed, !id %in% c("GP1", "YL72", "YL79"))
@@ -101,7 +101,7 @@ In this formula, “i” represents a constant and the polar coordinates, X and 
 
 ## Convert CRS to Projected Coordinate System
 
-Before converting our locations to complex numbers, we first need to make our data spatial and then project the coordinate reference system (CRS) to one with measurable units (e.g., UTM).
+Before converting our locations to complex numbers, we first need to make our data spatial and then project the coordinate reference system (CRS) to one with measurable units (e.g., UTM, in meters).
 
 We can use the `st_transform` function for this, specifying UTM Zone 11 North for our elk data (EPSG Code: 32611).
 
@@ -118,7 +118,7 @@ elk_utm <- elk_processed2 |>
 elk_utm
 ```
 
-Now we can extract the matrix of projected coordinates for our data with the `st_coordinates` function, then passing the X and Y information to individual columns in our sf data.
+Now we can extract the matrix of projected coordinates for our data with the `st_coordinates` function, passing the X and Y information as individual columns in our sf data.
 
 ```{r}
 
@@ -130,14 +130,14 @@ elk_processed2$Y <- xy_coords[,2]
 
 ## Calculate Complex Locations
 
-Now that we have X and Y columns in our data, we can plug these into our complex number formula to get complex locations (Z).
+Now that we have X and Y columns in our data, we can plug these into our complex number formula to get complex locations (Z)!
 
 ```{r}
 
 elk_processed2$Z <- elk_processed2$X + 1i*elk_processed2$Y
 ```
 
-We can also do this using the `complex` function (see "?complex" for more info).
+We can also do this using the `complex` function (see `?complex` for more info).
 
 ```{r}
 elk_processed2$Z <- complex(re = elk_processed2$X, im = elk_processed2$Y)
@@ -159,29 +159,53 @@ Let's try it on one individual, GP1.
 
 GP1 <- subset(elk_processed2, id == "GP1")
 
-layout(cbind(c(1,1),2:3))
-par(bty = "l", mar = c(2,2,2,2))
-
-with(GP1, {
-  plot(X, Y, asp =1, pch = 19, cex = 0.7)
-  plot(date, X, pch = 19, cex = 0.7)
-  plot(date, Y, pch = 19, cex = 0.7)
-})
+lpar(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+layout(rbind(c(1,2), c(1,3)))
+plot(GP1$X, GP1$Y, asp = 1, type="o", ylab="Latitude", xlab="Longitude")
+plot(GP1$datetime, GP1$X, type="o", xaxt="n", ylab="Longitude", xlab="")
+plot(GP1$datetime, GP1$Y, type="o", ylab="Latitude", xlab="Datetime")
+title(paste("ID", GP1$id[1]), outer = TRUE)
 ```
+
+We can also do this for all individuals, using the methods we learned in lab 1, but this time for data with X and Y coordinates, not lat/lon. 
+
+```{r}
+plotTrack_XY <- function(dataframe){
+  par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+  layout(rbind(c(1,2), c(1,3)))
+  plot(dataframe$X, dataframe$Y, asp = 1, type="o", ylab="Latitude", xlab="Longitude")
+  plot(dataframe$datetime, dataframe$X, type="o", xaxt="n", ylab="Longitude", xlab="")
+  plot(dataframe$datetime, dataframe$Y, type="o", ylab="Latitude", xlab="Datetime")
+  title(paste("ID", dataframe$id[1]), outer = TRUE)
+}
+```
+
+```{r}
+detach("package:dplyr", unload=TRUE)
+
+library(plyr)
+
+library(dplyr)
+```
+
+```{r}
+elk_processed2 |> d_ply("id", plotTrack_XY)
+```
+
 
 # Calculate Movement Metrics
 
 Now that we have our data as complex locations, we can easily quantify useful movement metrics for our elk, such as step lengths (straight line displacement between consecutive locations) and relative turning angles (difference in absolute direction between consecutive locations).
 
-Following our rule of "generalizable" data processing, we will create a function that calculates these movement metrics for an individual. 
+Following our rule of "generalizable" data processing, we will create a function that calculates these movement metrics for each individual. 
 
-The step length, also called the "Modulus", can be calculated with the formula: sqrt(X^2 + Y^2). It can also be extracted from a complex number with the function `Mod()`. 
+The step length, also called the "Modulus", can be calculated with the formula: sqrt(X^2 + Y^2). It can also be extracted from a complex number with the function `Mod()`. The absolute angle between locations is called the "Argument" and can be extracted from a complex number with the function “Arg()”. For more information, see the help file `?complex`.
 
-The absolute angle between locations is called the "Argument" and can be extracted from a complex number with the function “Arg()”.
+
 
 ## Define Function
 
-We define our function in code chunk below, assigning it a name and an input object ("dataframe").
+We define our function in the code chunk below, assigning it a name and an input object ("dataframe"). The function will return the same dataframe but annotated with the new movement metrics we calculate in the function.
 
 ```{r}
 getMovementMetrics <- function(dataframe){
@@ -246,7 +270,7 @@ str(elk_move)
 
 ## Check the Fix Rate
 
-Checking the fix rate, we can see that the data is irregular in time, meaning that step lengths are not comparable over the tracks but the movement rate (km/day) is.
+Checking the fix rate, we can see that the data is irregular in time, meaning that step lengths are not comparable over the tracks but the movement rate (km/day) is. For future analyses with discrete time assumptions, we may need to regularize our data to account for large gaps or irregular fix rates in the data.
 
 ```{r}
 dtime <- function(t, ...) {difftime(t[-1], t[-length(t)], ...) %>% as.numeric}
@@ -294,7 +318,8 @@ steplengths <- na.omit(elk_move$step_length_km)
 hist(steplengths, col="grey", bor="black", freq=FALSE, breaks=50, main ="Steplengths (km)")
 lines(density(steplengths), col=2, lwd=2)
 ```
-We can use the "circular" R package to create a rose diagram of our turning angles, which require circular statistics. 
+
+We can use the "circular" R package to create a rose diagram of our turning angles (which require circular statistics, ranging from 0 to pi). 
 
 ```{r}
 library(circular)
