@@ -27,26 +27,31 @@ head(elk_processed)
 
 # Select Example Individual and Visualize
 
-We will use one individual from our data as an example, "YL96". This individual has some "patches" of residency- like behavior along its track.
+We will use one individual from our data as an example, "YL96". This individual has some "patches" of residency-like behavior along its track.
 
 ```{r}
 elk_example_data <- subset(elk_processed, id == "YL96")
+
+str(elk_example_data)
 ```
 
 
-We can use Base R to visualize the track of this individual in space and time:
+We can use Base R to visualize the track of this individual in space and time, using the methods we learned in lab 1:
 
 
 ```{r}
-ggplot(data=elk_example_data, aes(x=lon, y=lat)) +
-  geom_path(size=0.5) +
-  theme_classic()
+par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+layout(rbind(c(1,2), c(1,3)))
+plot(elk_example_data$lon, elk_example_data$lat, asp = 1, type="o", ylab="Latitude", xlab="Longitude")
+plot(elk_example_data$datetime, elk_example_data$lon, type="o", xaxt="n", ylab="Longitude", xlab="")
+plot(elk_example_data$datetime, elk_example_data$lat, type="o", ylab="Latitude", xlab="Datetime")
+title(paste("ID", elk_example_data$id[1]), outer = TRUE)
 ```
 
 
 # First Passage Time
 
-First Passage Time (FPT) can be a useful paramter to describe scales of behavior along a movement track. 
+First Passage Time (FPT) can be a useful parameter to describe scales of behavior along a movement track. 
 
 It is generally defined as the time observed for an animal to pass through a circle, with radius "r", where "r" defines the scale of behavior.
 
@@ -64,7 +69,8 @@ library(sf)
 In order to fit the `fpt` function, we first need to:
 
 1 - make our data spatial (sf)
-2 - convert our data to be SpatialPoints format (from another spatial package, sp)
+
+2 - convert our data to be "SpatialPoints" format (from another spatial package, sp, which is automatically installed and loaded with the adehabitatLT package).
 
 
 
@@ -81,7 +87,7 @@ str(elk_example_sp)
 We can now use the `as.ltraj` function to convert out data into ltraj format.
 
 ```{r}
-elk_example_traj <- as.ltraj(coordinates(elk_example_sp), date=elk_example_data$date, id = elk_example_data$id)
+elk_example_traj <- as.ltraj(coordinates(elk_example_sp), date = elk_example_data$datetime, id = elk_example_data$id)
 
 summary(elk_example_traj)
 ```
@@ -90,6 +96,7 @@ We can use the `head` function to look at the ltraj data table for this individu
 ```{r}
 head(elk_example_traj[[1]])
 ```
+
 We can also plot the trajectory of the individual, which shows the start and end locations in red and blue.
 
 ```{r}
@@ -111,7 +118,7 @@ We can see a plateau in the variance at ~4000-5000 m.
 varlogfpt(elk_example_fpt, graph=TRUE)
 ```
 
-Now that we have decided on our spatial scale of interest, we can refit our `fpt' function and plot the results.
+Now that we have decided on our spatial scale of interest, we can refit our `fpt` function and plot the results.
 
 ```{r}
 elk_example_fpt <- fpt(elk_example_traj, radii = 5000, units="hours")
@@ -119,9 +126,11 @@ elk_example_fpt <- fpt(elk_example_traj, radii = 5000, units="hours")
 plot(elk_example_fpt, scale = 5000, warn = FALSE)
 ```
 
-We can bind our FPT values to our data as a column by extacting it from our FPT object.
+We can bind our FPT values to our data as a column by extracting it from our FPT object.
 
-We can plot these values over our latitude values by scaling both of them (`scale` function). Periods of higher FPT seem to mostly correspond to the distinct patches of possible "residential" behavior.
+We can plot these values over our latitude values by scaling both of them (`scale` function).
+
+Periods of higher FPT seem to mostly correspond to the distinct patches of possible "residential" behavior.
 
 ```{r}
 library(ggplot2)
@@ -144,13 +153,14 @@ ggplot() +
 
 # Lavielle Method
 
-Lavielle’s method identifies break points in a timeseries by applying a moving window over the timeseries. The optimal number of segments, k, in the timeseries is then determined by minimizing the "penalized contrast function" (Lavielle 2005). Break points are determined using the mean, variance, or mean AND variance along the timeseries.
+Lavielle’s method identifies behavioral break points by applying a moving window over the timeseries. The optimal number of segments, k, in the timeseries is then determined by minimizing the "penalized contrast function" (Lavielle 2005). Break points are determined using the mean, variance, or mean AND variance along the timeseries of the variable of interest (e.g., speed).
 
-WE will use the same example dataset as previous, to compare results.
+We will use the same example dataset as in the FPT analysis, to compare results.
 
 ```{r}
 str(elk_example_data)
 ```
+
 This method also uses the "adehabitatLT" package. 
 
 The Lavielle Method is fit using the `laveielle` function, where the user can specify the:
@@ -163,7 +173,9 @@ The Lavielle Method is fit using the `laveielle` function, where the user can sp
   
   4 - type - how to distinguish the segments (mean, variance, or both, "meanvar")
   
-We can use the visualizations of the track to inform our decisions on these parameters. Here, we will use a minimum of 20 locations, max of 5 segments, and the mean to determine segments by latitude.
+We can use the visualizations of our track to inform our decisions on these parameters. 
+
+Here, we will use a minimum of 20 locations, max of 5 segments, and the mean to determine segments by latitude.
 
 
 ```{r}
@@ -206,7 +218,7 @@ elk_example_data_lav <- tidyr::fill(elk_example_data_lav, segment, .direction = 
 head(elk_example_data_lav)
 ```
 
-We can visualize the final results using ggplot. 
+We can visualize the final results using ggplot: 
 
 ```{r}
 elk_example_data_lav$segment <- as.character(elk_example_data_lav$segment)

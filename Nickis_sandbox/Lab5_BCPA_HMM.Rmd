@@ -27,19 +27,21 @@ head(elk_processed)
 
 # Select Individuals (Non-Residential)
 
-We can use one of the visualization methods we learned to examine the tracks for non-residential (migratory) behavior.
+We can one of the visualization methods we learned to examine the tracks for non-residential (migratory) behavior.
 
 ```{r}
 library(ggplot2)
 ```
 
 
-```{r fig.height=15, fig.width=7}
+```{r fig.height=15, fig.width=6}
 ggplot(data=elk_processed, aes(x=lon, y=lat)) +
-  geom_path(size=0.5, color="darkgrey") +
+  geom_path(size=0.5) +
   theme_classic() +
   facet_wrap(~id, scale="free", ncol=3)
 ```
+
+We will use the dplyr package and "%in%" condition to select some of the individuals with clear distinctions between residential and transiting behavior (movement "blob" followed by a straight dispersal line and then a second movement "blob").
 
 ```{r}
 library(dplyr)
@@ -54,18 +56,192 @@ elk_mig <- elk_processed |>
 
 ```
 
+We can visualize our selected tracks, looking at the change in latitude over time. Each track has a clear residential period in latitude, followed by a drop in latitude, a second residential period, and for most, a second spike in latitude as they disperse back to the first area of residency. 
+
 ```{r}
 ggplot(data=elk_mig, aes(x=datetime, y=lat)) +
-  geom_path(size=0.5, color="darkgrey") +
+  geom_path(size=0.5) +
   theme_classic() +
   facet_wrap(~id, scale="free", ncol=2)
 ```
 
-# Data Regularization (AniMotum)
 
-install from my R-universe repository
+# Behavioral Change Point Analysis
 
-need latest TMB and Matrix package versions also
+The "smoove" package allows for multiple continuous-time movement models (correlated velocity models or CVMs) to be fit to irregular tracking data to identify "modes" of behavior. 
+
+Each model comes with it's own set of parameters and "best" fitting models are determined using AIC/BIC and maximum likelihood. 
+
+CVM model options include: Uncorrelated CVM (UCVM), Advective CVM (AVCM), Rotational CVM (RCVM), and Rotational-Advective CVM (RACVM). 
+
+A single-change point can also be identified assuming just a UCVM process and sudden changes in the UCVM parameters, time scale, and root mean square speeds.
+
+Check out the "smooth" package [vignette](https://htmlpreview.github.io/?https://github.com/EliGurarie/smoove/blob/master/doc/smoove.html) for more examples and details.
+
+```{r eval=FALSE}
+library(devtools)
+
+install_github("EliGurarie/smoove")
+```
+
+```{r}
+library(smoove)
+library(sf)
+```
+
+First, we need to use the methods we learned in lab 1 to convert our data to an sf object and then convert the coordinates to a projected coordinate system. We then extract and store the coordinates and save them as X and Y variables in our data.
+
+```{r}
+elk_utm <- elk_mig |>
+  st_as_sf(coords = c("lon","lat"), crs = 4326) |>
+  st_transform(32611)
+
+coords <- st_coordinates(elk_utm)
+
+elk_mig$X <- coords[,1]
+
+elk_mig$Y <- coords[,2]
+
+elk_mig$Z <- elk_mig$X + 1i*elk_mig$Y
+```
+
+We will select one of our "migratory" individuals as an example for the analyses, "YL73".
+
+```{r}
+elk_example <- elk_mig |>
+  dplyr::select(id, datetime, X, Y, Z) |>
+  dplyr::filter(id == "YL73")
+
+```
+
+We can use the `scantrack` function from the "smoove" package to plot this individual's track in multiple dimensions:
+
+```{r}
+
+with(elk_example, scan_track(x = X, y = Y, main = "YL73"))
+```
+
+We can now apply the `sweepRACVM` function to:
+
+1 - set a "window" size to move along the track and detect changes in behavior (size should reflect temporal scale of behavior of interest)
+
+2 - using the set window and the "windowstep" as the step size, "sweep" along the track, and determine the likelihoods of various changepoints.
+
+We will try a window size of ~ 200 days and windowstep of ~ 30 days. 
+
+*Note*: this can take a long time to run. The parallel example may be a better option, especially if your computer has a decent number of cores.
+
+```{r eval = FALSE}
+elk_sweep <- with(elk_example, sweepRACVM(Z = Z, T = datetime, windowsize = 200, time.unit = "days", windowstep = 30, model = "RACVM", progress = TRUE))
+```
+
+To use the parallel example, you first have to install and load the "doParallel" package.
+
+```{r}
+library(doParallel)
+```
+
+You then need to use the `makeCluster` and `detectCores` functions to define the clusters for parallel processing.
+
+```{r eval = FALSE}
+cl <- parallel::makeCluster(parallel::detectCores())
+
+doParallel::registerDoParallel(cl)
+```
+
+The same function can now be run, using the ".parallel = TRUE" argument instead.
+
+```{r eval = FALSE}
+elk_sweep <- with(elk_example, sweepRACVM(Z = Z, T = date, windowsize = 200, time.unit = "days", windowstep = 30, model = "RACVM", progress = TRUE, .parallel = TRUE))
+```
+
+```{r include = FALSE}
+#save(elk_sweep, file="./data/elk_behavioral_changepoint.rda")
+
+load("./data/elk_behavioral_changepoint.rda")
+```
+
+
+The resulting object can be plotted with the `plotWindowSweep` function to visualize the relative log-likelihood profile for a single window. 
+
+Here, you are looking for distinct peaks in the log-likelihood, which indicate significant changepoints.
+
+```{r}
+plotWindowSweep(elk_sweep, main = "YL73")
+```
+
+Now that the likelihood profiles for candidate change points have been determined, the `findCandidateChangePoints` function can be used to identify the distinct changepoints in the data based on these likelihood profiles.
+
+The "clusterwidth" argument can be used to group changepoints together that may be quite similar.
+
+You can also decide which models to use as candidates for each changepoint segment (UCVM, ACVM, RCVM, RACVM) - here, we use "all" and additionally use AIC for model selection, as BIC can be overly conservative.
+
+*Note*: If your clusterwidth is too low, the function will give you a warning that some of the candidate changepoints are too close in time to each other to be considered distinct.
+
+```{r}
+elk_cp <- findCandidateChangePoints(windowsweep = elk_sweep, clusterwidth = 6) |>
+  getCPtable(modelset = "all", criterion="AIC")
+```
+
+Finally the different behavioral phases corresponding the chosen changepoints can be estimated and summarized using the `estimatePhases` and `summarizePhases` functions:
+
+```{r}
+elk_phases <- elk_cp |>
+  estimatePhases()
+
+elk_phases_summ <- summarizePhases(elk_phases)
+
+```
+
+```{r}
+str(elk_phases_summ)
+```
+We can now merge our summarized phases object, which contains the time points for each changepoint, with our original data, using the tidyr R package function `fill` to fill in the missing values for each phase's data. 
+
+```{r}
+elk_phases_data <- merge(elk_example, elk_phases_summ, all = TRUE, by.x = c("datetime"), by.y = c("end")) |> arrange(datetime) |>
+  tidyr::fill(phase, start, model, eta, tau, rms, .direction = "updown")
+
+str(elk_phases_data)
+```
+
+Lastly, we can visualize the different models and phases over time and change in latitude:
+
+```{r}
+ggplot(data = elk_phases_data, aes(x = datetime, y = Y, color = model))+
+    geom_path(size=1)+
+    xlab("Datetime")+ylab("Latitude")+
+    theme_classic()
+```
+
+```{r}
+ggplot(data = elk_phases_data, aes(x = datetime, y = Y, color = phase))+
+    geom_path(size=1)+
+    xlab("Datetime")+ylab("Latitude")+
+    theme_classic()
+```
+
+
+
+
+# Hidden Markov Model
+
+Hidden Markov Models (HMMs) can be used for time series data to describe 2 processes, one observed (e.g., the data produced by telemetry, such as locations and movement metrics) and one "hidden", representing the "hidden" ecological behaviors driving the observed data.
+
+The Markov chain portion of HMM's state that the probability of being in a particular behavior state at time *t+1* is **only** dependent on the current state at time *t*. Once these probabilities are described, a transition probability matrix, or the probability of moving between behavior states, can be described. HMM's can have any number of hidden behavioral states, granted that they are biologically meaningful (model selection can also assist with determining the "optimal" number of states).
+
+Importantly, HMMs are performed in discrete time and assume that observations are "conditionally independent". These can be difficult for movement data derived from tags, which can be prone to irregularly spaced observations and errors.
+
+Before fitting an HMM to our example elk data, we need to first regularize the locations in time.
+
+
+## Data Regularization (AniMotum)
+
+A useful and very fast package for track regularization in R is the "AniMotum" R package. This package itself actually uses a fast-fitting state space model framework (similar to an HMM but taking into account locational error) to predict locations in regular time along a trajectory.
+
+You can read more about this package with the published paper, [Jonsen et al 2023](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.14060) and with the [AniMotum OVerview Vignette](https://ianjonsen.github.io/aniMotum/articles/Overview.html).
+
+You will need to install the package using the following code and ensuring that the latest versions of the "TMB" and "Matrix" R packages are also installed.
 
 ```{r eval=FALSE}
 
@@ -84,10 +260,13 @@ install.packages("Matrix")
 library(aniMotum)
 ```
 
-data should be structured with columns:
-id, date (POSIXct), lc, lon, lat and (optional) additional locational error information smaj, smin, eor (Argos tags)
+For use with the aniMotum package, your data needs to have the following *exact* column names, order, and structure: id, date (POSIXct), lc, lon, lat and (optional) additional locational error information (e.g., smaj, smin, eor columns that come with Argos satellite tag data).
 
-lc (location class) can include the following values: 3, 2, 1, 0, A, B, Z, G, or GL. The latter two are for GPS locations and 'Generic Locations', respectively. Class Z values are assumed to have the same error variances as class B. By default, class G (GPS) locations are assumed to have error variances 10x smaller than Argos class 3 variances, but unlike Argos error variances the GPS variances are the same for longitude and latitude
+The column for lc (location class) can include the following values: 3, 2, 1, 0, A, B, Z, G, or GL. The latter two are for GPS locations and 'Generic Locations', respectively. 
+
+Class Z values are assumed to have the same error variances as class B. By default, class G (GPS) locations are assumed to have error variances 10x smaller than Argos class 3 variances, but unlike Argos error variances, the GPS variances are the same for longitude and latitude.
+
+Since our data is from GPS collars, we will the class "G" option for the lc column:
 
 ```{r}
 elk_mig2 <- elk_mig |>
@@ -95,7 +274,9 @@ elk_mig2 <- elk_mig |>
   dplyr::select(id, date, lc, lon, lat)
 ```
 
-check sampling rate
+We now need to choose a sampling rate to predict our locations to.
+
+This should be informed by the most prominent fix rates in your data. You can check this using the following code (see also in lab 1):
 
 ```{r}
 dtime <- function(t, ...) {difftime(t[-1], t[-length(t)], ...) %>% as.numeric}
@@ -111,14 +292,11 @@ sample.rate <- elk_mig2 |>
 barplot(table(sample.rate$dtime))
 ```
 
-use sample rate of 2 hours
+A barplot shows us that a sample rate ~ 2 hours might be a good choice.
 
-vmax: m/s
+We can now fit the predictive model to our data, using the `fit_ssm` function and additional arguments, such as the maximum speed ("vmax", in m/s, and above which locations will be flagged as outliers), the desired time step ("time.step", in hours), and the model type ("rw" for random walk and "crw" for correlated random walk).
 
-time.step: hrs
-
-random walk: better for large data gaps than crw
-
+We will use a reasonable max speed cut off of 20 m/s, a random walk model (works better for large gaps), amd a time step of 2 hours.
 
 ```{r eval=FALSE}
 elk_ssm_fit <- fit_ssm(elk_mig2,
@@ -134,11 +312,12 @@ elk_ssm_fit <- fit_ssm(elk_mig2,
 load("./data/elk_ssm_fit.rda")
 ```
 
+We can use the `summary` function to look at the individual-level model results, including whether the models convered and AIC values.
 
 ```{r}
 summary(elk_ssm_fit)
 ```
-
+We can define a function, `extractPredictions`, to extract the predicted lat/lon coordinates for our data.
 
 ```{r}
 
@@ -161,12 +340,16 @@ extractPredictions <- function(ssm_fit){
 
 ```
 
+We can apply the function to list of fitted models for each individual.
+
 ```{r}
 elk_ssm_list <- elk_ssm_fit$ssm
 
 elk_regdata_list <- lapply(elk_ssm_list,
                       extractPredictions)
 ```
+
+The predicted locations can be visualized over the original locations, using the ggplot function and storing the plots within a for-loop to print the results for each individual.
 
 ```{r}
 library(ggplot2)
@@ -190,8 +373,12 @@ for(i in c(1:length(elk_id))){
 track_plots
 ```
 
+We can then combine all of the individual dataframes with new predicted locations back together into one large dataframe, using the `do.call` function.
+
 ```{r}
 elk_regdata <- do.call("rbind", elk_regdata_list)
+
+str(elk_regdata)
 ```
 
 
@@ -201,6 +388,8 @@ save(elk_regdata, file="./data/elk_regdata.rda")
 ```
 
 ## Calculate Movement Metrics
+
+Now that our data is regular space/time, we can use the methods we learned in lab 2 to make our data spatial, convert the coordinates to a projected coordinate system, and save the X/Y coordinates as columns in our data.
 
 ```{r}
 library(sf)
@@ -223,7 +412,7 @@ elk_regdata$Y <- coords[,2]
 elk_regdata$Z <- elk_regdata$X + 1i*elk_regdata$Y
 ```
 
-
+We can then define a function to calculate various movement metrics, as in lab 2:
 
 ```{r}
 getMovementMetrics <- function(dataframe){
@@ -256,281 +445,30 @@ elk_reg_id <- split(elk_regdata, elk_regdata$id)
 ```{r}
 elk_reg_id2 <- lapply(elk_reg_id,
                             getMovementMetrics)
+
+elk_reg <- do.call("rbind", elk_reg_id2)
+
+str(elk_reg)
 ```
 
+## Fit HMM
 
-# Lavielle
+Now that our data is regularized and we have our movement metrics annotated to our data, we can fit our HMM to one of the individual's as an example and see if we can identify discrete behaviors.
 
-The Lavielle’s method identifies breaking points in a timeseries by using a moving window through the timeseries and a penalized contrast function which determines the optimal number of segments in the timeseries by minimizing the penalized contrast function (Lavielle 2005)
-
-The method examine the variation in the mean and/or variance of a timeseries and identify the optimal number of break points, by fitting the mean, variance or both to the timeseries depending on the number of segments (K). As K increases, the fit increases. However, there should be a number of segments K after which adding more segments does not contributes significantly to improving the fit. The penalized contrast function adjust the trade-off between fit and K
-
-```{r}
-library(adehabitatLT)
-```
-
-
-```{r}
-str(elk_reg_id2[["YL73"]])
-```
-
-
-```{r}
-ggplot(data = elk_reg_id2[["YL73"]], aes(x = date, y = lat))+
-  geom_path(color="darkgrey") +
-  geom_point(size=0.5) +
-  theme_classic() +
-  xlab("Date") + ylab("Latitude")
-```
-
-decide a minimum number of relocations within a segment (Lmin), the maximum number of segments we want the function to try (Kmax) and if it should look at the difference in mean, variance, or both (mean, var, meanvar)
-
-```{r}
-elk_example_data <- elk_reg_id2[["YL73"]]
-
-elk_lavielle_example <- lavielle(elk_example_data$lat, Lmin = 50, Kmax = 10, type = "mean")
-```
-
-```{r}
-chooseseg(elk_lavielle_example)
-```
-
-
-```{r}
-elk_lavielle_example_path <- findpath(elk_lavielle_example, 3)
-```
-
-```{r}
-
-breakpoints <- unlist(elk_lavielle_example_path)
-
-breakpoints
-```
-
-```{r}
-breakpoints_df <- data.frame(Row_ID = breakpoints, segment = c(1,1,2,2,3,3))
-
-elk_example_data$Row_ID <- cumsum(rep(1, nrow(elk_example_data)))
-
-elk_example_data_lav <- merge(elk_example_data, breakpoints_df, by="Row_ID", all.x=TRUE)
-
-elk_example_data_lav <- tidyr::fill(elk_example_data_lav, segment, .direction = 'down')
-
-head(elk_example_data_lav)
-```
-
-# First Passage Time
-
-The first passage time (FPT) is a parameter often used to describe the scale at which patterns occur in a trajectory. For a given scale r, it is defined as the time required by the animals to pass through a circle of radius r.
-
-Fauchald & Tveraa (2003) proposed another use of the FPT. Instead of computing the mean of FPT, they propose the use of the variance of the log(FPT). This variance should be high for scales at which patterns occur in the trajectory (e.g. area restricted search). This method is often used to determine the scale at which an animal seaches for food
-
-```{r}
-library(mapview)
-```
-
-```{r}
-elk_example_track <- elk_example_data |>
-  st_as_sf(coords=c("lon","lat"), crs= 4326) |>
-  st_union() |>
-  st_cast("LINESTRING") 
-
-mapview(elk_example_track)
-```
-
-
-
-transform the data into ltraj object
-
-```{r}
-elk_example_sp <- elk_example_data |>
-  st_as_sf(coords=c("lon","lat"), crs= 4326) |> 
-  st_transform(32611) |>
-  st_cast("POINT") %>% as_Spatial()
-
-elk_example_traj <- as.ltraj(coordinates(elk_example_sp), date=elk_example_data$date, id = elk_example_data$id)
-
-summary(elk_example_traj)
-```
-
-```{r}
-head(elk_example_traj[[1]])
-```
-```{r}
-plot(elk_example_traj)
-```
-
-
-radii - numeric vector for the radii of the circles
-
-units - time units of the results
-
-```{r}
-elk_example_fpt <- fpt(elk_example_traj, radii = seq(50, 10000), units="hours")
-```
-
-peak in variance at spatial scale of interest
-
-```{r}
-varlogfpt(elk_example_fpt, graph=TRUE)
-```
-
-
-```{r}
-elk_example_fpt <- fpt(elk_example_traj, radii = 10000, units="hours")
-
-plot(elk_example_fpt, scale = 9000, warn = FALSE)
-```
-
-```{r}
-
-elk_example_data$FPT <- elk_example_fpt[[1]]$r1
-
-ggplot() +
-  geom_path(data = elk_example_data, aes(x = date, y = scale(FPT)), color="darkgrey", size = 1) +
-  geom_path(data = elk_example_data, aes(x = date, y = scale(lat)), color ="orange", alpha = 0.6, size = 1) +
-  geom_point(data = elk_example_data, aes(x = date, y = scale(FPT))) +
-  theme_classic() +
-  ylab("Scaled FPT (grey) vs Latitude (orange)")
-```
-
-# Behavioral Change Point Analysis
-
-The "smoove" package allows for multiple continuous-time movement models (correlated velocity models or CVMs) to be fit to irregular tracking data to identify "modes" of behavior. Each model comes with it's own set of parameters and best models are determined using AIC/BIC and maximum likelihood. CVM model options include: Uncorrelated CVM (UCVM), Advective CVM (AVCM), Rotational CVM (RCVM), and Rotational-Advective CVM (RACVM). A single-change point can also be identified assuming just a UCVM process and sudden changes in the UCVM parameters, time scale, and root mean square speeds.
-
-```{r eval=FALSE}
-library(devtools)
-
-install_github("EliGurarie/smoove")
-```
-
-```{r}
-library(smoove)
-```
-
-
-```{r}
-elk_utm <- elk_regdata |>
-  st_as_sf(coords = c("lon","lat"), crs = 4326) |>
-  st_transform(32611)
-
-coords <- st_coordinates(elk_utm)
-
-elk_regdata$X <- coords[,1]
-
-elk_regdata$Y <- coords[,2]
-
-elk_regdata$Z <- elk_regdata$X + 1i*elk_regdata$Y
-
-elk_example <- elk_regdata |>
-  dplyr::select(id, date, X, Y, Z) |>
-  dplyr::filter(id=="YL73")
-
-```
-
-```{r}
-
-with(elk_example, scan_track(x = X, y = Y, main = "YL73"))
-```
-
-specify window size (how long does behavior last?)
-
-try: 200 days
-
-takes awhile to run
-
-```{r eval = FALSE}
-elk_sweep <- with(elk_example, sweepRACVM(Z = Z, T = date, windowsize = 200, time.unit = "days", windowstep = 30, model = "RACVM", progress = TRUE))
-```
-
-parallel example
-
-```{r}
-library(doParallel)
-```
-
-```{r eval = FALSE}
-cl <- parallel::makeCluster(parallel::detectCores())
-
-doParallel::registerDoParallel(cl)
-
-elk_sweep <- with(elk_example, sweepRACVM(Z = Z, T = date, windowsize = 200, time.unit = "days", windowstep = 30, model = "RACVM", progress = TRUE, .parallel = TRUE))
-```
-
-```{r include = FALSE}
-#save(elk_sweep, file="./data/elk_behavioral_changepoint.rda")
-
-load("./data/elk_behavioral_changepoint.rda")
-```
-
-
-
-
-colors represent the relative log-likelihood profile for a single window
-
-looking for distinct peaks (significant change points) 
-
-```{r}
-plotWindowSweep(elk_sweep, main = "YL73")
-```
-
-Can specify the clusterwidth here- I used widths ranging from 1-6, based on warnings given with fitting the function for each id
-
-I used all models as candidates (UCVM, ACVM, RCVM, RACVM)
-
-I additionally used AIC to determine models, as BIC can be overly conservative
-
-```{r}
-elk_cp <- findCandidateChangePoints(windowsweep = elk_sweep, clusterwidth = 6) |>
-  getCPtable(modelset = "all",criterion="AIC")
-```
-
-estimate phases
-
-```{r}
-elk_phases <- elk_cp |>
-  estimatePhases()
-
-elk_phases_summ <- summarizePhases(elk_phases)
-
-```
-
-```{r}
-str(elk_phases_summ)
-```
-
-
-```{r}
-elk_phases_data <- merge(elk_example, elk_phases_summ, all = TRUE, by.x = c("date"), by.y = c("end")) |> arrange(date) |>
-  tidyr::fill(phase, start, model, eta, tau, rms, .direction = "updown")
-
-str(elk_phases_data)
-```
-
-
-```{r}
-ggplot(data = elk_phases_data, aes(x = date, y = Y, color = model))+
-    geom_path(size=1.5)+
-    xlab("Datetime")+ylab("Latitude")+
-    theme_classic()
-```
-
-```{r}
-ggplot(data = elk_phases_data, aes(x = date, y = Y, color = phase))+
-    geom_path(size=1.5)+
-    xlab("Datetime")+ylab("Latitude")+
-    theme_classic()
-```
-
-
-
-
-# Hidden Markov Model
+We will use the "momentuHMM" package to fit our HMM, a package which fits HMM's very quickly and with a variety of personalization options (including user-specified parameter distributions, options for hierarchical and multivariate models). You can find out more information with the [momentuHMM vignette](https://cran.r-project.org/web/packages/momentuHMM/vignettes/momentuHMM.pdf).
 
 ```{r}
 library(momentuHMM)
 ```
 
+We will use the same individual as in the BCPA, "YL73".
+
+```{r}
+elk_example <- elk_reg |>
+  dplyr::filter(id == "YL73")
+```
+
+We first prepare our data using the `prepData` function to grab our X/Y coordinates.
 
 ```{r}
 elk_hmm_prep <- prepData(elk_example, type = "UTM",
@@ -539,40 +477,44 @@ elk_hmm_prep <- prepData(elk_example, type = "UTM",
 head(elk_hmm_prep)
 ```
 
-set any step lengths with a value of 0 to 1 (can't have 0's)
+We then make sure that all of our step lengths ("step" within the prepped object data) have values > 0.
 
 ```{r}
 elk_hmm_prep$step[elk_hmm_prep$step == 0] <- 1
 ```
 
-define priors and prior distributions
+MomentuHMM specifies HMM's within a Bayesian framework, where prior distributions can be specified for each state-specific parameter to help distinguish the "true" behavioral state when combined with observed distributions. 
 
-1 - state 1
+We will start with a two-state model with state-specific and distribution specific parameters for each variable that will be used to distinguish our behavioral states, namely the step length and relative turning angles.
 
-2 - state 2
+We will make our priors somewhat informative, assuming that one state will be defined by smaller step lengths (smaller mean and sd) and bigger turning angles (smaller concentration parameter), with the opposite for the second state. 
 
 ```{r}
 stepMean0 <- c(m1 = 100, m2 = 4000)
+
 stepSD0 <- c(sd1 = 50, sd2 = 1000)
+
 angleCon0 <- c(rho1  = 0.1, rho2 = 0.8)
 ```
+
+We will now assign names to our states, with the slower, more tortuous state being defined as a "resident" state and the faster, straighter state as a "transit" state.
 
 ```{r}
 stateNames <- c("resident","transit")
 ```
 
-set distributions for variables (step lengths and turning angles)
 
-set priors (mean and sd for steps, concentration for angle)
+We now pick distributions for our variables of interest (step length and turning angle), using a Gamma distribution for the step lengths (`?dgamma`) and a Wrapped Cauchy distribution for the turning angles (`dwrpcauchy`).
 
-see ?dgamma and ?dwrpcauchy
+We store our priors defined in the code chunk above into a list object, "Par0".
 
 ```{r}
 dist <- list(step = "gamma", angle = "wrpcauchy")
+
 Par0 <- list(step=c(stepMean0, stepSD0), angle = c(angleCon0))
 ```
 
-nbStates = number of states to identify
+We can now fit our HMM using the `fitHMM` function with our prepped data and objects from above. We also specify the number of states to identify ("nbStates").
 
 ```{r}
 elk_hmm_fit <- fitHMM(data = elk_hmm_prep, nbStates = 2, dist = dist, 
@@ -581,7 +523,7 @@ elk_hmm_fit <- fitHMM(data = elk_hmm_prep, nbStates = 2, dist = dist,
 print(elk_hmm_fit)
 ```
 
-viterbi formula to decode the transition probabilities for most likely states at each time point/location
+After fitting our model, we can use the Viterbi formula with the `viterbi` function to decode the transition probabilities for the most likely states at each time point along our movement trajectory.
 
 ```{r}
 hmm_states <- viterbi(elk_hmm_fit)
@@ -589,29 +531,14 @@ hmm_states <- viterbi(elk_hmm_fit)
 str(hmm_states)
     
 ```
-what does this code do?
 
-```{r}
-M <- elk_hmm_fit$mle$gamma
-
-step <- elk_hmm_fit$mle$step
-
-angle <- elk_hmm_fit$mle$angle[2,] 
-```
-
-what does this code do? proportion of locs in each state?
-
-```{r}
-probs <- c(s2 = M[1,2]/(M[1,2] + M[2,1]), 
-              s1 = M[2,1]/(M[1,2] + M[2,1]))
-
-probs
-```
+We can add our predicted states as a column for each observation to our data:
 
 ```{r}
 elk_example$state <- hmm_states
 ```
 
+We can then plot the results, using Base R to make multidimensional plots of the trajectory with the annotated states:
 
 ```{r}
 
@@ -630,6 +557,13 @@ with(elk_example, {
            date[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
 })
 ```
+
+We can also convert our data to an sf structure and use the methods we learned in lab 1 to plot the trajectory with each location colored by the predicted state with the mapview package.
+
+```{r}
+library(mapview)
+```
+
 
 ```{r}
 elk_example_sf <- elk_example |>
@@ -645,8 +579,11 @@ mapview(elk_example_track, color="darkgrey") +
   mapview(elk_example_sf, zcol="state", col.regions=c("orange","blue"))
 ```
 
-refit and 
-add covariate (latitude)
+We can see from the plot that our movement "blobs" still have a mixture of both colors. We can try fitting a multivariate HMM, with latitude as a covariate, to assist with further separating our two states along our movement track.
+
+To fit a multivariate HMM, we define our formula with desired covariate(s), here "y" for latitude.
+
+We then re-fit the model using the `fitHMM` function, adding formula in as an argument.
 
 ```{r}
 formula <- ~y
@@ -657,6 +594,7 @@ elk_hmm_fit2 <- fitHMM(data = elk_hmm_prep, nbStates = 2, dist = dist,
 print(elk_hmm_fit2)
 ```
 
+We can then decode the states and bind them to our dataframe, as before:
 
 ```{r}
 hmm_states <- viterbi(elk_hmm_fit2)
@@ -665,7 +603,7 @@ elk_example$state <- hmm_states
     
 ```
 
-
+We can compare the results using a plot again:
 
 ```{r}
 
@@ -685,7 +623,11 @@ with(elk_example, {
 })
 ```
 
-add a third state
+There is still quite a bit of blue in our orange "blobs"!
+
+This may suggest that there are actually 3 behavioral states here: one that is fast and straight (blue state), one that is slower and tortuous (orange state), and a third that is intermediate, where the animal is having directed, faster movements within its residential patch.
+
+We can fit a 3 state model by simply adding an additional state-specific prior for each movement variable.
 
 ```{r}
 stepMean0 <- c(m1 = 100, m2 = 4000, m3 = 1000)
@@ -693,14 +635,18 @@ stepSD0 <- c(sd1 = 50, sd2 = 1000, sd3 = 500)
 angleCon0 <- c(rho1  = 0.1, rho2 = 0.8, rho3 = 0.5)
 ```
 
+We will label this third state as an additional "faster" residential state.
+
 ```{r}
-stateNames <- c("resident","transit", "other")
+stateNames <- c("resident-slow","transit", "resident-faster")
 ```
 
 ```{r}
 dist <- list(step = "gamma", angle = "wrpcauchy")
 Par0 <- list(step=c(stepMean0, stepSD0), angle = c(angleCon0))
 ```
+
+We re-fit the model as before, but this time specifying 3 states.
 
 ```{r}
 formula <- ~y
@@ -710,6 +656,7 @@ elk_hmm_fit3 <- fitHMM(data = elk_hmm_prep, nbStates = 3, dist = dist,
 
 ```
 
+We can decode our model results and bind the predicted states for each observation back to our data:
 
 ```{r}
 hmm_states <- viterbi(elk_hmm_fit3)
@@ -718,7 +665,7 @@ elk_example$state <- hmm_states
     
 ```
 
-
+Now if we plot the results with our new state in green, we can see that our model did a much better job at finding our transiting state and two residential states within our movement "blobs"!
 
 ```{r}
 
