@@ -1,0 +1,367 @@
+---
+title: 'Lab 2: Some Data Visualization'
+author: "Nicki Barbour and Elie Gurarie"
+date: "2024-05-18"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
+                      warning = FALSE, cache = TRUE)
+knitr::opts_knit$set(root.dir = '../../')
+```
+
+# Visualizations
+
+Visualizing data is an important step in the data processing and analysis stages.
+
+Learning how to visualize your data correctly can help you catch errors in your code, outliers in your data, and interesting patterns that will inform your analysis choices.
+
+Visualization can be done with Base R plotting - which provides more control - or the `ggplot2` R package - which is excellent for exploratory analysis and complex plots in one line of code.  We'll also load the `sf` package. 
+
+```{r}
+library(ggplot2)
+library(sf)
+```
+
+
+## Base R
+
+We can use base R to specify a "fancy" plot showing each of our tracks in multiple dimensions, including latitude/longitiude, latitude versus time, and longitude versus time.
+
+Note that using a geographic coordinate system (GCS) with units in angular degrees (lat/lon) can be useful for mapping and observing patterns in the data but that direct, measurable comparisons can only be made with a projected coordinate system (PCS), where the units are in measurable units (e.g., meters). We will demonstrate how to work with projected coordinates in the next lab.
+
+*Note*: You may find this online resource on [Plotting with Base R](https://bookdown.org/rdpeng/exdata/the-base-plotting-system-1.html) useful if you are unfamiliar with the `plot` function and its various arguments.
+
+We start by loading our clean and processed data files: 
+
+```{r loaddata}
+load("data/elk_processed.rda")
+is(elk_gps)
+is(elk_sf)
+```
+
+Recall that this contains `elk_gps` and `elk_sf`. Because there are so many elk in this example, we will reduce the data to the first 9 animals:
+
+```{r subsetdata}
+str(elk_gps)
+elk_gps <- elk_gps |> subset(id %in% levels(id)[1:9])
+elk_sf <- elk_sf |> subset(id %in% levels(id)[1:9])
+```
+
+
+### In space
+
+Let's make a basic R plot of the track for the individual, `4049`:
+
+```{r}
+E4049 <- subset(elk_gps, id == "4049")
+with(E4049, plot(lon, lat))
+```
+
+We can "connect the points":
+
+```{r}
+with(E4049, plot(lon, lat, type = "o"))
+```
+
+### In space - metric
+
+> **Extra- in metric:** Since we have a correctly projected version of this animal, we could also extract the coordinates in an 
+appropriate UTM format, to get a sense of the distance traveled.  This cute piece of code finds the UTM zone from any longitude: 
+
+```{r}
+long2UTM <- function(long) (floor((long + 180)/6) %% 60) + 1
+```
+
+> In our case, the UTM zone will be: 
+
+```{r}
+long2UTM(-115)
+```
+> Now, we just need to find the EPSG code for that UTM zone.  It is (from quick searching): [32611](https://epsg.io/32611).  
+So - to draw this in metric units: 
+
+
+```{r E4049_xyplot}
+E4049.xy <-  elk_sf |> subset(id == 4049) |> st_transform(32611) |> st_coordinates()
+plot(E4049.xy, asp = 1, type = "o")
+```
+
+
+> This is nice, because it shows that the movement was *mainly* north-south. 
+> These are so useful, we might want to add them to our original data: 
+
+```{r  addXY}
+require(sf)
+elk_gps <-  elk_gps |> data.frame(elk_sf |> st_transform(32611) |> st_coordinates())
+str(elk_gps)
+```
+
+
+### In space and time
+
+I (EG) find the following plot, which I've always called a "scan track"  to be very useful because it lets us see what's going on in both space AND time.  
+
+```{r scantrack1, echo = -1}
+par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+layout(rbind(c(1,2), c(1,3)))
+with(E4049, {
+  plot(lon, lat, asp = 1, type="o", ylab="Latitude", xlab="Longitude")
+  plot(datetime, lon, type="o", xaxt="n", ylab="Longitude", xlab="")
+  plot(datetime, lat, type="o", ylab="Latitude", xlab="Datetime")
+  title(paste("ID", id[1]), outer = TRUE)
+})
+
+```
+
+We can also write our own little function to apply this plot to several  individuals at once.
+
+> For more information/help on writing functions in R, check out this helpful online resource, [Writing Functions in R](https://dept.stat.lsa.umich.edu/~jerrick/courses/stat701/notes/functions.html).
+
+```{r scan_track function}
+scan_track <- function(dataframe, x = "lon", y = "lat",
+                             time = "datetime", id = "id", ...){
+  par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+  layout(rbind(c(1,2), c(1,3)))
+  with(dataframe, {
+    plot(get(x), get(y), asp = 1, type="o", ylab=y, xlab=x, ...)
+    plot(get(time), get(x), type="o", xaxt="n", ylab=y, xlab="", ...)
+    plot(get(time), get(y), type="o", ylab=y, xlab=time, ...)
+    title(paste("ID", id[1]), outer = TRUE)
+  })
+}
+```
+
+There are a few tricks in this function that make it extra flexible.  For example, this is the default:
+
+```{r}
+scan_track(elk_gps |> subset(id == id[1]))
+```
+
+But this is looking UTM's, and with fun colors: 
+
+```{r}
+myelk <- elk_gps |> subset(id == id[1])
+scan_track(myelk, x = "X", y = "Y", 
+                 col = topo.colors(nrow(myelk)))
+```
+
+This plot is very helpful for seeing what the elk is doing. 
+
+### Scan tracks across indviduals
+
+We can use the `plyr` package with the `d_ply` function to apply our new function grouped by a variable of interest, here each individual. This function will simply return the output of the function used (see also `ddply`, which we will use later to return a dataframe based on a function's output).
+
+> *Note*: plyr and dplyr do not "play nice" with each other. You need to load the dplyr package AFTER the plyr package to avoid conflicts and function masking. We can use the `detach` function to unload our dplyr package, then use the `library` function to load the plyr and dplyr packages, consecutively. If you see that a particular function is "masked" you can use the package name and ":" before the name of a particular function from a particular package to ensure that masking (which happens when you have functions of the same name in two packages that are loaded) does not occur (e.g., `dplyr::select()`).
+
+
+The following code generates the figure above for the first 5 elk, for example:
+
+```{r}
+require(plyr)
+elk_gps |> subset(id %in% levels(id)[1:5]) |> d_ply("id", scan_track)
+```
+
+
+## Using `ggplot` 
+
+The `ggplot` function takes arguments for the data object to be plotted, the x and y axis variables to be plotted (within the `aes()` function), a variety of additional aesthetic arguments (e.g., color or linewidth), and additive functions that define the plot type.
+
+```{r}
+library(ggplot2)
+```
+
+
+For more help with plotting with ggplot, check out this helpful online resource, [ggplot2 with the tidyverse](https://ggplot2.tidyverse.org/).
+
+Let's make a plot for the elk individual "4049", using latitude for the X axis, longitude for the y-axis, and using points and a connecting "path" between points to plot the track.
+
+```{r}
+ggplot(data = E4049, aes(x = lon, y = lat)) +
+   geom_path(size = 0.5) +
+   geom_point(aes(color = datetime)) + theme_classic()
+```
+
+Now let's visualize all individuals at once, using the additional `facet_wrap` function to facet or group our plots by each elk id. The "scale = 'free' " argument allows each plot to have its own intuitive x and y axis limits ("scale='fixed' does the opposite).
+
+```{r facetted_elk, fig.height=9, fig.width=9}
+ggplot(data = elk_gps, aes(x = lon, y = lat)) +
+  geom_path(size = 0.5, color = "darkgrey") +
+  geom_point() +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol=3)
+```
+
+Or - also useful - all together.  Note the `col` and `group` arguments:  
+
+```{r all_the_elk_on_one_ggplot, fig.height=9, fig.width=9}
+ggplot(data = elk_gps, aes(x = lon, y = lat, col = id, group =id)) +
+  geom_path(size = 0.5, color = "darkgrey") +
+  geom_point() +
+  theme_classic() 
+```
+
+
+We can also visualize latitude or longitude versus datetime. This can be especially helpful for identifying interesting behavioral patterns in animal movement (e.g., residency vs transiting), which can inform your choice of analysis method later on.
+
+```{r fig.height=9, fig.width=9}
+ggplot(data = elk_gps, aes(x = datetime, y = lat)) +
+  geom_path(size = 0.5) +
+  xlab("DateTime") + ylab("Latitude") +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol = 2)
+```
+
+We see a nice variety of migratory behavior. 
+
+## Spatial Plots and Mapping
+
+### Base R plots
+
+`sf` objects can be plotted by their attributes using the `plot` Base R function.
+
+For example, we can plot the points (or "geometry", which are points) for the "GP1" elk individual, after subsetting its data from the larger "elk_sf" object we created above.
+
+```{r}
+plot(elk_sf[,"id"], pch = 19)
+```
+
+Without a background map, this plot is not very informative!
+
+### ggplot and ggmap
+
+The "ggmap" package works helpfully with ggplot functions and sf data to add open-source basemaps. More info on the package can be found on the [ggmap Github Repo Page](https://github.com/dkahle/ggmap).
+
+```{r}
+library(ggmap)
+```
+
+Importantly, you need internet access to download the open-source base map "tiles".
+
+You also FIRST need to register for a *free API key* with Stadia Maps at their [API Signup Page](https://client.stadiamaps.com/signup/) (see `?register_stadiamaps`).
+
+After you complete your registration, go to your [client dashboard](https://client.stadiamaps.com/dashboard/?utm_source=docs&utm_content=api_key_callout#/overview) and create a new "property" (e.g., "Nicki's API"). You can now create a new API key (save this somewhere on your computer so that you can find it if needed). You can also find instructions 
+under the [Stadia API Documentation Page](https://docs.stadiamaps.com/authentication/#api-keys).
+
+
+```{r}
+key <- "e644fe03-1f7b-4b05-87a8-c65335eb4625"
+register_stadiamaps(key, write = FALSE)
+```
+
+Now, before creating our map, we need to define the spatial extent for the basemap, defining the extent as a "box" defined by 2 points (left, bottom and top, right).
+
+```{r}
+elk_box <- c(left = -116.5, bottom = 51.3, right = -115.4, top = 52.2)
+```
+
+Next, we use the `get_map` function on our new bbox to grab the basemap, specifying source "stadia" to use the open source base maps. Note that there are different maptypes available, which will change the visual presentation of the basemap (see `?get_map`, we are using "stamen_terrain").
+
+```{r, eval = FALSE}
+basemap <- get_map(elk_box, source = "stadia", maptype  = "stamen_terrain")
+```
+```{r , eval = TRUE, echo = FALSE}
+# save(basemap, file = "_ignore/elk_basemap.rda")
+load("_ignore/elk_basemap.rda")
+```
+
+Annoyingly, defining an sf object removes the spatial columns from the data (they are stored inside an `st_geometry` column instead). We can extract each of the lat/long columns, using the `st_coordinates` function on our sf object (stored as a matrix, with long first, then lat).
+
+
+```{r}
+ggmap(basemap, extent = "normal") +
+  geom_point(data = elk_gps, aes(color=id)) +
+  geom_path(data = elk_gps, aes(color=id)) + 
+  scale_color_brewer()
+```
+Not bad - but it is hard to get good colors on top of this map!
+
+
+### ggplot and ggspatial
+
+We can use the `ggspatial` package to add open map tiles to the background of our map.
+
+Note that this can be memory-intensive if you are plotting a lot of data at a high resolution ...
+
+```{r}
+library(ggspatial)
+```
+
+The `ggspatial` R package is great for maps using Open Street Map (OSM) base map tiles (open source).
+
+The `annotation_map_tile` function allows you to specify a background map type (“type=”) and zoom level (`zoom=`, where a higher zoom is a higher resolution but may take longer to render). You can run the code `rosm::osm.types` to see all the different map tile types available (we will use the “osm” one).
+
+You can also add some nice map features, such as a scale bar (function `annotation_scale()`) and a north arrow (function `annotation_north_arrow()`, with arguments for specifying height, width, padding dimensions). You can also specify nicer axis labels and breaks using the `scale_y_continuous` and `scale_x_continuous` functions, specifying the
+
+You can then add on your other, regular ggplot functions, such as `geom_sf` and theme options.
+
+```{r GGspatial}
+box <- st_bbox(c(xmin = -116.4, xmax = -115.4, ymin = 51.5, ymax = 52.2), crs = st_crs(4326))
+
+E4049.sf <- subset(elk_sf, id == "4049")
+
+ggplot() +
+  annotation_map_tile(type = 'osm', zoom = 11) +
+  annotation_scale() +
+  annotation_north_arrow(height=unit(0.5,"cm"), width=unit(0.5,"cm"), pad_y = unit(1,"cm"))+
+  shadow_spatial(box )+
+  ylab("Latitude") + xlab("Longitude")+
+  scale_x_continuous(breaks= seq(-116, -115.2, .4))+
+  geom_sf(data=E4049.sf, aes(), color="orange", size=2)+
+  theme_classic()
+```
+
+
+
+#### Export Static Map
+
+If you wanted to export your map, you could do so by sandwhiching your map code between the file type function you want the image to be saved as (e.g., `jpeg` or `png`) and the function `dev.off`.
+
+```{r eval = FALSE}
+jpeg(file="./E4049_Map.jpg", units="in", width=4, height=7,res=300)
+E4049.sf <- subset(elk_sf, id == "4049")
+ggplot() +
+  annotation_map_tile(type = 'osm', zoom = 12) +
+  annotation_scale() +
+  annotation_north_arrow(height=unit(0.5,"cm"), width=unit(0.5,"cm"), pad_y = unit(1,"cm"))+
+  shadow_spatial(box )+
+  ylab("Latitude") + xlab("Longitude")+
+  scale_x_continuous(breaks= seq(-116, -115.2, .4))+
+  geom_sf(data=E4049.sf, aes(), color="orange", size=2)+
+  theme_classic()
+dev.off()
+```
+
+
+### mapview
+
+Interactive mapping in R with the "mapview" R package is a useful way to visualize and engage with spatial data.
+
+```{r}
+library(mapview)
+```
+
+Let's create spatial tracks of all of our elk data, using our "elk_sf" object. 
+
+We use the `summarize` function and the `st_cast` function with the `group_by` function from the dplyr package to first create individual elk tracks, as LINESTRINGS.
+
+
+```{r}
+elk_tracks <- elk_sf |> 
+  group_by(id) |> 
+  summarize(do_union=FALSE) |> 
+  st_cast("LINESTRING")
+```
+
+Now we can use the `mapview` function to plot our tracks, specifying to color the tracks by different ids with the "zcol" argument. Note that the `mapview` function can plot any spatial data and has a variety of additional controls/arguments available (see [Advanced Mapview Controls](https://r-spatial.github.io/mapview/articles/mapview_02-advanced.html) for more options and examples).
+
+```{r finalmapview, cache = FALSE}
+mapview(elk_tracks, zcol="id")
+```
+

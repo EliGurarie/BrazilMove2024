@@ -1,0 +1,431 @@
+---
+title: 'Lab 1: Processing Movement Data'
+author: "Nicki Barbour and Elie Gurarie"
+date: "2024-05-18"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
+                      warning = FALSE)
+knitr::opts_knit$set(root.dir = '../../')
+```
+
+# The Example Data for This Course
+
+![](images/elk.jpeg)
+
+The data we will be working with throughout this course consist of GPS tracking data for Ya Ha Tinda elk (**Cervus canadensis**) from [Hebblewhite et al 2008](https://doi.org/10.1890/06-1708.1) and the [Ya Ha Tinda Elk Project](https://www.umt.edu/yahatinda/). 
+
+Some elk in this population are migratory (migrating to to Banff National Park in the summer), others are residential to the Ya Ha Tinda area year-round, and others have demonstrated "switching" behavior between residential and migratory.
+
+This data is also available on [Movebank](https://www.movebank.org/cms/movebank-main).
+
+# Data Processing in R
+
+## General Principles of Data Processing
+
+Data that has been processed "smartly" will have the following features:
+
+* **Compartamentalized** - e.g., each step in your code/methods uses functions and the most efficient code possible
+
+* **Interactive** - e.g., leverage visualization and interactive tools
+
+* **Generalizable** - e.g., able to be applied to multiple individuals
+
+* **Replicable** - e.g., saving your code and data products regularly and NEVER overwriting the raw data
+
+* **Well-Documented** - e.g., commenting your code along the way, keeping files in organized folders, and storing methods in an external document as you go
+
+Follow these guidelines and you will save yourself from many future data processing head aches!
+ 
+
+## Specific Goals of Data Processing
+
+Often include: 
+
+- Renaming columns to something that makes sense to you
+- Taming dates and times
+- Geospatially projecting the data
+
+Later - there is removal of errors.  
+
+## Bringing Data into R 
+
+Data can be brought into R many ways:
+
+* `read.csv` - a Base R function to read in CSV files by calling the file path of wherever the file is stored
+
+* `load` - a Base R function to load in an `.Rda` object (native R data object)
+
+* `getMovebankData` - function from the `move` package (Kranstauber et al 2023) to retrieve Movebank datasets by name
+
+### Read a CSV File In
+
+Excel loves to mess up date/time information, so be sure to check that your datetime column is formatted correctly (to include both the data AND time, with hours, minutes, & seconds, if applicable) before reading it into R. 
+
+The file path should correspond to wherever you saved your CSV file on your computer.
+
+> *Note*: It is helpful to first set your working directory (`setwd()`), so that you don't have to call the entire file every time.
+
+```{r loadElkCSV}
+elk_gps <- read.csv("data/Elk_GPS_data.csv")
+str(elk_gps)
+```
+
+Lots of observations!
+
+
+### Load an Rda Object
+
+Native R data fies (often with extention `.Rda` - but can be anyting) are a useful way to store data. Essentially, R stores your object(s) as a compressed file type. 
+
+It's also good practice to save your intermediate R objects in a `\Data\` folder in your R project or repository. For example, a great time to save your data would be after processing!
+
+You can save data using the `save()` Base R function and then `load()` it, using the same file path you saved it to.
+
+When saving, don't forget to add the file name and type at the end of the file path!
+
+```{r eval = FALSE}
+save(elk_gps, file="./data/elk_gps.rda")
+```
+
+```{r}
+load("./data/elk_gps.rda")
+str(elk_gps)
+```
+
+
+### Load In Movebank Data
+
+[Movebank](https://www.movebank.org/cms/movebank-main) is an incredibly useful (online) resource and repository for storing and accessing tracking datasets for a variety of species. 
+
+Public data can be downloaded either online or through the "move" R package. After installing the package (`install.package`), we can load the package for use in our R session using the `library` Base R function.
+
+```{r}
+library(move)
+```
+
+You will need to make a Movebank account and login first, using the `movebankLogin` function.
+
+```{r eval = FALSE}
+mylogin <- movebankLogin(username = 'YourUsername', password = 'yourpassword')
+```
+
+Now you can use your login information object within the `getMovebankData` function to access the study you are interested in. 
+
+Let's access one of the [Elk Movebank Datasets](https://www.movebank.org/cms/webapp?gwt_fragment=page=studies,path=study897981076).
+
+> *IMPORTANT* - you first need to go the study page on Movebank, log in with your credentials, and under the "Download" tab, click "Download Data" and then agree to the license agreement. You can now download the data on the web to your computer OR use the function below to download the data.
+
+```{r eval=FALSE}
+elk_move <- getMovebankData(study = "Ya Ha Tinda elk project, Banff National Park, 2001-2023 (females)", 
+                            login = mylogin, removeDuplicatedTimestamps=TRUE)
+```
+
+```{r eval=FALSE}
+load(file="./data/elk_move.rda")
+```
+
+
+```{r eval = FALSE}
+head(elk_move)
+```
+
+The `getMovebankData` function will return a `MoveStack` object, which is specially formatted for the `move` package functions.
+
+We can do a quick plot of the elk locations in this dataset using the `plot` function on our MoveStack object.
+
+```{r eval = FALSE}
+plot(elk_move)
+```
+
+We can convert it to a basic R data frame object using the `as.data.frame` function.
+
+```{r eval = FALSE}
+elk_df <- as.data.frame(elk_move)
+str(elk_df)
+```
+
+## Data Processing Steps
+
+Processing data will always be specific to your data and needs. Sometimes it can be helpful to do some processing and data cleaning outside of R (e.g., within Excel, especially for datetime information). 
+
+You find it useful to diagram or write out your data processing needs BEFORE trying to draft your code.
+
+R is a powerful tool for quick, efficient, and reproducible data processing and cleaning. If there is ever something you don't know how to do in R, a quick Google search or taking a look at one of the many R resources online (e.g., [R-Bloggers](https://www.r-bloggers.com/) or [Stack Overflow](https://stackoverflow.com/)) will likely eventually result in a solution.
+
+In thie example, we are going to really work on the original `.csv` file, which is loaded: 
+
+```{r loadElk.csv}
+elk_gps <- read.csv("data/Elk_GPS_data.csv")
+```
+
+
+
+### Step 1: Re-Name or Drop Columns
+
+There are almost always multiple ways to do the same thing in R.  
+
+For example, the `[]` operator can be used to grab specific columns by their name or number in a data frame (*names are always preferred as there is less change of error*).
+
+```{r}
+names(elk_gps)
+```
+For example, to remove the lasct two columns (which we don't need), you can do: 
+
+```{r}
+elk_gps2 <- elk_gps[, -c(4:5)]
+names(elk_gps2)
+```
+
+or actively select the columns you DO want.  The core minimum, really, is just X, Y, Time and ID. 
+
+```{r}
+elk_gps2 <- elk_gps[, c("X","timestamp",
+                             "location.long", "location.lat",
+                             "individual.local.identifier")]
+names(elk_gps2)
+```
+OR you can use `mutate()` to eliminate hte columns you don't want: 
+
+```{r}
+require(plyr)
+elk_gps2 <- elk_gps |> mutate(X = NULL,  
+                              sensor.type = NULL, 
+                              migration.stage = NULL)
+str(elk_gps2)
+```
+
+Note the structure of your data as well. R has many different data structures but the main ones you will use are numeric, character (factor is similar but has levels), Posixct, and spatial. We will
+
+Columns can be renamed using the `names` Base R function OR the `rename()` function in the `plyr` package OR the `mutate` function in the `plyr` function, and probably other ways.
+
+For example, the follow lines of code all do the same thing: 
+
+```{r}
+elk_gps3 <- elk_gps2
+names(elk_gps3) <- c("datetime", "lon", "lat", "id")
+```
+
+But this is dangerous, because what if you get the order wrong? w
+
+This is safer
+
+```{r renameColumnsWithPlyr}
+require(plyr)
+elk_gps3 <- elk_gps2 |> 
+  plyr::rename(c(timestamp = "datetime", 
+                 location.long = "lon", location.lat = "lat",
+                 individual.local.identifier = "id"))
+```
+
+
+### Step 2: Convert DateTime Column to Posixct Format
+
+R will read the date and time as a character string.  Furthermore, the way it reads the  data can depend in very particular ways on the locale of your computer (which is very stupid and annoyint). In the end, for R to understand how to analyze time, you have to convert your date and time to a computer-standard `POSIXct` format. 
+
+There are two ways to do this: 
+
+1. Use the base `as.POSIXct()` function 
+2. use the more user-friendly `ymd_hms` functoin in the `lubridate` package. 
+
+For the first, you need to be careful to specify the format of the datetime column **exactly** as it is, using POSIXct syntax (eg, `%m` for month, `%d` for day, `%Y` for year, `%H` for hours, `%M` for minutes, and `%S` for seconds).
+
+the format of our datetime column:
+
+```{r}
+elk_gps3$datetime[1]
+```
+On THIS computer, the format is "month / day / year  hour:minute:day.  
+
+Using the `asPOSIXct` you specify via: 
+
+```{r asPOSIX}
+elk_gps4 <- elk_gps3
+elk_gps4$datetime <- as.POSIXct(elk_gps3$datetime, format="%m/%d/%Y %H:%M:%S")
+str(elk_gps4)
+```
+
+OR - using `lubridate` - and piping via `mutate()`.  While we're here, let's also made `id` a factor: 
+
+```{r lubridate}
+require(lubridate)
+elk_gps4 <- elk_gps3 |> mutate(datetime = mdy_hms(datetime), 
+                               id = factor(id))
+```
+
+Now that our datetime column is in POSIXct format, we can perform mathemetical operations on this column and return the results in units of time.
+
+```{r difftime}
+elk_gps4$datetime[2] - elk_gps4$datetime[1]
+```
+
+For example, we can use the `difftime` function to take the difference in time between our first and second observations in the datetime column, specifying the desired units for the output:
+
+
+```{r}
+difftime(elk_gps4$datetime[2] , elk_gps4$datetime[1], units = "mins")
+```
+
+### Step 3: Check for Missing Data
+
+R stores missing values as `NA`. 
+
+You can check for NA values in a vector or column using the `is.na()` function, which handily will return a vector the same length, with TRUE where there are NA's and FALSE where there are not NA's.
+
+Let's use the `subset` Base R function to select only the rows in our elk data where there are *no NA's* for datetime, lat, and lon. 
+
+```{r subsetaway}
+elk_gps5 <- subset(elk_gps4, !is.na(datetime) & !is.na(lon) & !is.na(lat))
+str(elk_gps5)
+```
+
+
+### A pause to pipe!
+
+One ugly thing we did here is create a whole bunch of copies of the data (`elk_gps`, `elk_gps1`, `elk_gps2`, etc ...)!    This is *correct*, in that it is better not to change and rename the same object multiple times.  But it is also *bad* because it clutters the workspace. 
+
+For this, the great solution is "piping", which is to say to start with only the raw data file and perform ALL of the operations in one smooth pipe:
+
+```{r performTheWholePipe}
+rm(list=ls())
+require(plyr); require(lubridate)
+elk_gps <- read.csv("data/Elk_GPS_data.csv") |> 
+  # 1. keep only columns we want
+  mutate(X = NULL,  sensor.type = NULL, migration.stage = NULL) |> 
+  # 2. rename the columsn with names we like
+  plyr::rename(c(timestamp = "datetime", 
+                 location.long = "lon", location.lat = "lat",
+                 individual.local.identifier = "id")) |> 
+  # 3. fix the data and time
+  mutate(datetime = mdy_hms(datetime)) |> 
+  # 4. remove missing data
+   subset(!is.na(datetime) & !is.na(lon) & !is.na(lat))
+```
+Note - this would work with a completely "virgin" workspace (assuming you set your working directory correctly).  
+
+```{r}
+str(elk_gps)
+```
+Smooth and easy!
+
+> <font color = "green"> **Class Exercise 1:**  Take a dataset of interest - ideally your own - and create a single "pipe" that reduces the data to `Lon` (or `X`), `Lat` (or `Y`) `datetime`, `id` and any other covariate that you think is important.  
+</font> 
+
+### Step 4: Check for Duplicate Data, Sort By Time
+
+Duplicated data can falsely inflate your data with observations and result in conflicts with various functions used for analyses later.
+
+One way to do this is to use some of the data frame manipulation functionality of the `dplyr` R package for more data organizing and cleaning. 
+
+```{r}
+library(dplyr)
+```
+
+Before filtering out duplicate datetime data (using the `filter` function to select the rows that are not duplicated, using the "!" condition) and sorting our data by datetime information (using the `arrange` function, which automatically sorts in increasing order), we first need to group the data by each individual in our dataset (our "id" column) so that the functions are applied to each individual separately.
+
+We then `ungroup` our data to combine the results among all individuals and use the `data.frame` function to ensure the resulting object is a dataframe structure.
+
+```{r}
+require(dplyr)
+elk_gps2 <- elk_gps |>
+  group_by(id) |>
+  filter(!duplicated(datetime)) |>
+  arrange(datetime) |>
+  ungroup() |>
+  data.frame()
+
+head(elk_gps2)
+```
+
+> **Advanced topic: write your own function**
+> 
+>   You might think that's an awful lot of obscure code for one purpose.  We can "bundle" all of that into a single function that is very easy to use later.  Here is how that would look: 
+
+
+```{r}
+removeDuplicated <- function(df){
+# this function takes a data frame and returns the same 
+# data frame but after filtering away shared values 
+# of ID and Time - to remove duplicates
+  df |>
+  group_by(id) |>
+  filter(!duplicated(datetime)) |>
+  arrange(datetime) |>
+  ungroup() |>
+  data.frame()
+}
+```
+
+> with this function:
+
+```{r}
+elk_gps2 <- removeDuplicated(elk_gps)
+```
+
+
+### Step 5: Make Data Spatial 
+
+Spatial data in R comes in multiple formats (vectors, e.g. points, lines, and polygons, or rasters). You may find the online resource [Spatial Data Science with R and “terra”](https://rspatial.org/) helpful for further information.
+
+There are multiple packages in R for formatting spatial data but an essential standard for most vector (i.e. non-raster) spatial data - that is points, lines, polygons, and multi- versions of all of those, is the `sf` **Simple Feature** package.  The standard for raster data has been the `raster` package, but it is being slowly supplanted by the `terra` package.
+
+Movement data are spatial vectors, so we will rely heavily on the `sf` package.  
+
+```{r}
+library(sf) 
+```
+
+The most important goal of making data "spatial" is to *georeference* it, i.e. attach each point of the data to a specific location on a specific model of the Earth's surface.  If you are working with movement/tracking data, you should have columns with geographic coordinate information for each observation in the dataset, with this information often being stored in latitude/longitude format (units: angular decimal degrees).
+
+Let's convert our elk data to "sf" format, using the `st_as_sf()` function, specifying the columns with our coordinate information (latitude first, then longitude) and the Coordinate Reference System EPSG code (*4326* corresponds to WGS 1984, a Geographic Coordinate System for data with coordinates in units of decimal degrees).
+
+Our new sf object is a `POINT` vector type, with each location/observation in the data having a corresponding `POINT` geometry. The `sf` package has many amazing functions to manipulate spatial data, including spatial operations and conversion to different vector types. But for now - the most important thing to do is to save it as a spatial object: 
+
+```{r}
+elk_sf <- elk_gps2 |>
+  st_as_sf(coords = c("lon","lat"), crs=4326)
+elk_sf
+```
+
+**Sneak Peak:** We will do lots of plotting soon.  But just to give you a quick preview of why it is so great that these data are georeferenced, check this out: 
+
+```{r}
+require(mapview)
+mapview(elk_sf |> subset(id == id[[1]]))
+```
+
+> <font color = "green"> **Class Exercise 2:**  Georeference your data and plot it using the `mapview` function. 
+</font> 
+
+Amazing!and Easy!
+
+# The Final Processing Pipe:
+
+Here is everything all togeter
+
+```{r}
+require(plyr); require(lubridate); require(dplyr); require(sf)
+elk_gps <- read.csv("data/Elk_GPS_data.csv") |> 
+  mutate(X = NULL,  sensor.type = NULL, migration.stage = NULL) |> 
+  plyr::rename(c(timestamp = "datetime", 
+                 location.long = "lon", location.lat = "lat",
+                 individual.local.identifier = "id")) |> 
+  mutate(datetime = mdy_hms(datetime),
+         id = factor(id)) |> 
+  subset(!is.na(datetime) & !is.na(lon) & !is.na(lat)) |> 
+  removeDuplicated() 
+
+elk_sf <- st_as_sf(elk_gps, coords = c("lon", "lat"), crs = 4326)
+```
+Finally - and very importantly - we save these processed files!  You can put them both into the same file
+
+```{r eval = FALSE}
+save(elk_gps, elk_sf, file = "data/elk_processed.rda")
+```
+

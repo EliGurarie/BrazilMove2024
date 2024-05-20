@@ -67,18 +67,26 @@ The outline of the course below is approximate.  We'll be posting links to mater
 
 #### Morning: **Introductions / Overview**
 
+
+- [Overview](Day1/01_Overview/Overview.html)
+
 <font color = "darkred"> 
 **Present:** *about yourself*
-
 Please come prepared with 2-3 slides to introduce yourself, your study system, your ecological questions, and a brief description of your data. 
 </font>
 
+**Topic: Processing Movement Data**
+
+- [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
+- [Lab](Day1/02_ProcessingData/PreliminaryProcessing.html)
 
 #### Afternoon: Summarizing and Visualizing
 
-- Managing data in R,
-- Using complex numbers
-- Different ways to plot
+**Topic: Visualizing Movement Data**
+- [Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html)
+
+**Topic: Complex Numbers are Simple**
+- [Lecture/Lab](Day1/03_SummariesVisualization/ComplexNumbers.html)
 
 <font color = "darkred"> 
 **Exercise:** *summarize and plot your data*
