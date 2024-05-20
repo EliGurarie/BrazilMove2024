@@ -78,6 +78,8 @@ Roughly:
 - home ranges
 - resource & step-selection
 
+Everthing in .blue.Large[R]
+
 ]
 
 .pull-right-50[ ![](images/ssl_moving.jpg)
@@ -118,7 +120,7 @@ Roughly:
 5-10 minutes each! 
 Throughout the week we will workshop your final projects every day. 
 
-Also: **James** and **Gustavo** will maybe teach special lectures
+Also: **James** and **Gustavo** and **Aline** will help out and  teach special lectures
 
 ]
 
