@@ -76,15 +76,17 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 
 - [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
 
-- [R Lab](Day1/02_ProcessingData/Lab1_DataProcessing.html)
+- [**R** Lab](Day1/02_ProcessingData/Lab1_DataProcessing.html) 
   - data here: [Elk_GPS_data.csv](data/Elk_GPS_data.csv) (right-click to download)
   
 **Guest Lecture from [Sarah Davidson](https://www.ab.mpg.de/person/98230/2736)** - from [Movebank](https://www.movebank.org/cms/movebank-main) 
 
 **Topic: Visualizing Movement Data**
-- [Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html)
+
+- [**R** Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html)
 
 **Topic: Complex Numbers are Simple**
+
 - [Lecture/Lab](Day1/03_SummariesVisualization/ComplexNumbers.html)
 
 <font color = "darkred"> 
