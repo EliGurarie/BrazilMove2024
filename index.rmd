@@ -35,6 +35,8 @@ Syracuse, NY 13210, USA
 
 </center>
 
+# Overview
+
 ## Goals
 
 This workshop is dedicated to developing skills in animal movement analysis, with an aim to start with foundations and build to useful and original inference.  We will learn about the properties of movement data, how to load, explore, visualize, and manipulate movement data.  We will learn the  properties and parameters of some fundamental discrete and continuous time movement models, and how to estimate those models.  We will cover tools for segmentation, behavioral analisys, and home ranging. We will relate movements to spatial data and environmental covariates.
@@ -72,7 +74,7 @@ The outline of the course below is approximate.  We'll be posting links to mater
 Please come prepared with 2-3 slides to introduce yourself, your study system, your ecological questions, and a brief description of your data. 
 </font>
 
-**Topic: Processing Movement Data**
+### Topic: Processing Movement Data**
 
 - [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
 
@@ -81,17 +83,13 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
   
 **Guest Lecture from [Sarah Davidson](https://www.ab.mpg.de/person/98230/2736)** - from [Movebank](https://www.movebank.org/cms/movebank-main) 
 
-**Topic: Visualizing Movement Data**
+### Topic: Visualizing Movement Data**
 
 - [**R** Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html)
 
-**Topic: Complex Numbers are Simple**
+### Topic: Complex Numbers are Simple**
 
 - [Lecture/Lab](Day1/03_SummariesVisualization/ComplexNumbers.html)
-
-<font color = "darkred"> 
-**Exercise:** *summarize and plot your data*
-</font>
 
 ## Day 2: Tuesday, May 21
 
