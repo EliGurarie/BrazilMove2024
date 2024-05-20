@@ -1,7 +1,7 @@
 ---
 title: 'Lab 2: Some Data Visualization'
 author: "Nicki Barbour and Elie Gurarie"
-date: "2024-05-18"
+date: "[Brazil Move 2024](https://eligurarie.github.io/BrazilMove2024)"
 output:
   html_document:
     theme: flatly
@@ -9,7 +9,6 @@ output:
     toc_float: true
 ---
 
-[**Animal Movement Analysis Short Course** | Campo Grande 2024](https://eligurarie.github.io/BrazilMove2024/)
 
 
 ```{r setup, include=FALSE}
