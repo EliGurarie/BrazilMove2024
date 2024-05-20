@@ -9,6 +9,8 @@ output:
     toc_float: true
 ---
 
+[**Animal Movement Analysis Short Course** | Campo Grande 2024](https://eligurarie.github.io/BrazilMove2024/)
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
@@ -362,6 +364,7 @@ elk_tracks <- elk_sf |>
 Now we can use the `mapview` function to plot our tracks, specifying to color the tracks by different ids with the "zcol" argument. Note that the `mapview` function can plot any spatial data and has a variety of additional controls/arguments available (see [Advanced Mapview Controls](https://r-spatial.github.io/mapview/articles/mapview_02-advanced.html) for more options and examples).
 
 ```{r finalmapview, cache = FALSE}
+require(mapview)
 mapview(elk_tracks, zcol="id")
 ```
 

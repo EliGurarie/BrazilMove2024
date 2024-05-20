@@ -16,12 +16,18 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, cache = TRUE, warning = FALSE, las = 1, dpi = 200)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
+                      cache = FALSE, warning = FALSE, las = 1, dpi = 200)
 ```
 
 ```{r colsFunction, eval = FALSE}
 xaringan::inf_mr()
 ```
+
+```{r xaringan-extras, echo=FALSE}
+xaringanExtra::use_tile_view()
+```
+
 
 # Movement Data
 
@@ -120,7 +126,7 @@ Several packages and `Rtools` particularly useful for data processing and clean-
 
 ## Loadinc csv's is easy!
 
-```{r LoadTapir1, echo = FALSE, eval = TRUE}
+```{r LoadTapir1, echo = 2, eval = TRUE}
 setwd("../../_ignore/tapir")
 tapir1 <- read.csv("tapir1.csv")
 head(tapir1)
@@ -132,7 +138,7 @@ head(tapir1)
 
 Try tapir 2:
 
-```{r LoadTapir2, echo = FALSE, eval = TRUE}
+```{r LoadTapir2, echo = 2, eval = TRUE}
 setwd("../../_ignore/tapir")
 tapir2 <- read.table("tapir2.csv")
 head(tapir2)
@@ -219,6 +225,12 @@ So we process to:
 2. rename them properly
 3. project to the same geometry as the first data
 4. combine together
+]
+
+
+--
+
+.pull-right[
 
 ```{r}
 tapir2 <- tapir.move[,c("tag_id", "timestamp", 
@@ -233,16 +245,13 @@ tapir_all <- rbind.fill(tapir, tapir2) |> st_as_sf()
 ]
 
 
---
-
-.pull-right[
+---
 
 ### Where were these tapirs?
 
-```{r}
+```{r, fig.width = 6}
 mapview(tapir_all, zcol = "ID")
 ```
-]
 
 
 ---

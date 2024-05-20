@@ -61,12 +61,9 @@ The course will mix lectures on concepts, theory and tools with practical labs u
 The outline of the course below is approximate.  We'll be posting links to materials (lecture and labs) as the course proceeds.  
 
 
-## Outline / Schedule (tentative!)
+# Schedule 
 
-### Day 1: Monday, May 20
-
-#### Morning: **Introductions / Overview**
-
+## Day 1: Monday, May 20
 
 - [Overview](Day1/01_Overview/Overview.html)
 
@@ -78,10 +75,11 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 **Topic: Processing Movement Data**
 
 - [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
+
 - [R Lab](Day1/02_ProcessingData/Lab1_DataProcessing.html)
   - data here: [Elk_GPS_data.csv](data/Elk_GPS_data.csv) (right-click to download)
   
-#### Afternoon: Summarizing and Visualizing
+**Guest Lecture from [Sarah Davidson](https://www.ab.mpg.de/person/98230/2736)** - from [Movebank](https://www.movebank.org/cms/movebank-main) 
 
 **Topic: Visualizing Movement Data**
 - [Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html)
@@ -93,9 +91,9 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 **Exercise:** *summarize and plot your data*
 </font>
 
-### Day 2: Tuesday, May 21
+## Day 2: Tuesday, May 21
 
-#### Morning: **Movement Models**
+### Morning: **Movement Models**
 
 <font color = "darkred"> 
 **Present:** *results from the previous day*
@@ -104,7 +102,7 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 - Correlated random walk, discrete time, continuous time movement models
 - Summary statistics and parameters
 
-#### Afternoon: **Segmentation**
+### Afternoon: **Segmentation**
 
 - First Passage Time
 - Lavielle segmentation
@@ -115,9 +113,9 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 **Exercise:** *Apply a movement model or segmentation method to your data.*
 </font>
 
-### Day 3: Wednesday, May 22
+## Day 3: Wednesday, May 22
 
-#### Morning:  **Home Range Analyses**
+### Morning:  **Home Range Analyses**
 
 <font color = "darkred"> 
 **Present:** *results from the previous day*
@@ -127,7 +125,7 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 - Kernel density estimates
 - Auto-correlated kernel density estimates
 
-#### Afternoon:  **Environmental Data**
+### Afternoon:  **Environmental Data**
 
 - Spatial data and annotations
 - Summaries of Use and Availability
@@ -136,9 +134,9 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 **Exercise:** *Estimate a home range and/or characterize environmental space use of your organism,*
 </font>
 
-### Day 4: Thursday, May 23
+## Day 4: Thursday, May 23
 
-#### Morning: **Resource Selection**
+### Morning: **Resource Selection**
 
 <font color = "darkred"> 
 **Present:** results from the previous day 
@@ -147,18 +145,16 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 - resource selection functions
 - step-selection functions
 
-#### Afternoon:  **Open Work Session**
+### Afternoon:  **Open Work Session**
 
+## Day 5: Friday, May 24
 
-
-### Day 5: Friday, May 24
-
-#### Morning: Special Topics
+### Morning: Special Topics
 
 By Gustavo and/or James and/or Nicki and/or Elie on selected topics of particular interest to students
 
 
-#### Afternoon: **Final Presentations**
+### Afternoon: **Final Presentations**
 
 <font color = "darkred">
 
