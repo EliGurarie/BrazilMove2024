@@ -1,5 +1,5 @@
 ---
-subtitle: "Brazil Move 2024"
+subtitle: "[Brazil Move 2024](https://eligurarie.github.io/BrazilMove2024)"
 title: "**Preliminary Processing of Movement Data**"
 author: "Elie Gurarie and Nicki Barbour"
 output: 

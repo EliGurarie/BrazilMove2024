@@ -1,7 +1,8 @@
 ---
 title: 'Lab 1: Processing Movement Data'
 author: "Nicki Barbour and Elie Gurarie"
-date: "[Brazil Move 2024](https://eligurarie.github.io/BrazilMove2024)"
+subtitle: "[Brazil Move 2024 - UFMS - Campo Grande](https://eligurarie.github.io/BrazilMove2024)"
+date: "May 20, 2024" 
 output:
   html_document:
     theme: flatly
