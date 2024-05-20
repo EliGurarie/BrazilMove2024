@@ -87,22 +87,18 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 
 - [**R** Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html)
 
-### Topic: Complex Numbers are Simple**
-
-- [Lecture/Lab](Day1/03_SummariesVisualization/ComplexNumbers.html)
-
 ## Day 2: Tuesday, May 21
 
-### Morning: **Movement Models**
+### Topic: Complex Numbers are Simple
 
-<font color = "darkred"> 
-**Present:** *results from the previous day*
-</font>
+- [Lecture/Lab](Day1/03_SummariesVisualization/ComplexNumbers.html)
+- See also book chapter [here](https://eligurarie.github.io/MovementEcologyBook/part2_data_and_manipulations/complex_numbers.html).  
 
-- Correlated random walk, discrete time, continuous time movement models
-- Summary statistics and parameters
+### Topic: Summary Statistics
 
-### Afternoon: **Segmentation**
+### Topic: Movement Models
+
+### Topic: **Segmentation**
 
 - First Passage Time
 - Lavielle segmentation

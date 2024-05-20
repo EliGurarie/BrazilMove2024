@@ -323,7 +323,7 @@ ggplot() +
 
 #### Export Static Map
 
-If you wanted to export your map, you could do so by sandwhiching your map code between the file type function you want the image to be saved as (e.g., `jpeg` or `png`) and the function `dev.off`.
+If you wanted to export your map, you could do so by sandwhiching your map code between the file type function you want the image to be saved as (e.g., `jpeg` or `png`) and the function `dev.off()`.
 
 ```{r eval = FALSE}
 jpeg(file="./E4049_Map.jpg", units="in", width=4, height=7,res=300)

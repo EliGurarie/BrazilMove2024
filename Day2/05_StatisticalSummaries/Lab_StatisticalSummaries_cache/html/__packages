@@ -1,0 +1,8 @@
+knitr
+plyr
+dplyr
+magrittr
+lubridate
+sf
+mapview
+ggplot2
