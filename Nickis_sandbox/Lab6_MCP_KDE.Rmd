@@ -34,8 +34,9 @@ library(dplyr)
 
 
 ```{r}
-elk_res <- elk_processed |>
-  filter(id %in% c("YL80", "YL91", "YL94"))
+elk_res <- elk_gps |>
+  filter(id %in% c("YL80", "YL91", "YL94")) |>
+  mutate(id = as.character(id))
 ```
 
 # Visualize Tracks
