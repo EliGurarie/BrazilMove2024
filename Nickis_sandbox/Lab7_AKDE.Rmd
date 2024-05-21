@@ -46,8 +46,9 @@ load("./data/elk_processed.rda")
 
 
 ```{r}
-elk_res <- elk_processed |>
-  dplyr::filter(id %in% c("YL80", "YL91", "YL94"))
+elk_res <- elk_gps |>
+  dplyr::filter(id %in% c("YL80", "YL91", "YL94")) |>
+  dplyr::mutate(id = as.character(id))
 ```
 
 
@@ -59,6 +60,8 @@ Our data needs to converted to a CTMM-friendly “telemetry” object, which is 
 elk_res2 <-  elk_res |> dplyr::select(id, datetime, lat, lon)
 
 names(elk_res2) <- c("individual.local.identifier","timestamp","location.lat","location.long")
+
+str(elk_res2)
 ```
 
 

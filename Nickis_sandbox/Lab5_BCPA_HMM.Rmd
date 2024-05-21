@@ -22,7 +22,7 @@ First, let's load in our processed data from lab 1.
 ```{r}
 load("./data/elk_processed.rda")
 
-head(elk_processed)
+head(elk_gps)
 ```
 
 # Select Individuals (Non-Residential)
@@ -35,7 +35,7 @@ library(ggplot2)
 
 
 ```{r fig.height=15, fig.width=6}
-ggplot(data=elk_processed, aes(x=lon, y=lat)) +
+ggplot(data=elk_gps, aes(x=lon, y=lat)) +
   geom_path(size=0.5) +
   theme_classic() +
   facet_wrap(~id, scale="free", ncol=3)
@@ -51,8 +51,9 @@ library(dplyr)
 
 ```{r}
 
-elk_mig <- elk_processed |>
-  filter(id %in% c("GP2", "YL25", "YL29", "YL73", "YL77", "YL78"))
+elk_mig <- elk_gps |>
+  filter(id %in% c("GP2", "YL25", "YL29", "YL73", "YL77", "YL78")) |>
+  mutate(id = as.character(id))
 
 ```
 

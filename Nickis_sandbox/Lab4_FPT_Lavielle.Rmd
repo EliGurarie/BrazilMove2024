@@ -22,7 +22,7 @@ First, let's load in our processed data from lab 1.
 ```{r}
 load("./data/elk_processed.rda")
 
-head(elk_processed)
+head(elk_gps)
 ```
 
 # Select Example Individual and Visualize
@@ -30,7 +30,8 @@ head(elk_processed)
 We will use one individual from our data as an example, "YL96". This individual has some "patches" of residency-like behavior along its track.
 
 ```{r}
-elk_example_data <- subset(elk_processed, id == "YL96")
+elk_example_data <- subset(elk_gps, id == "YL96") |>
+  dplyr::mutate(id = as.character(id))
 
 str(elk_example_data)
 ```
