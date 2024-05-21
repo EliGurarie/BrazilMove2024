@@ -31,9 +31,11 @@ packages <- c("plyr","dplyr","magrittr",
               "lubridate","sf", "mapview","ggplot2")
 sapply(packages, require, character = TRUE)
 ```
+
 ## Summarizing the Elk data
 
 Load the processed elk data: 
+
 ```{r, echo = -1}
 setwd("../..")
 load("data/elk_processed.rda")
@@ -72,7 +74,7 @@ Our data set is more or less as we want it. Depending on your research questions
 
 ## Exploring raw movement data
 
-Now that the data set is more manageable, we can explore the data, and especially look at the number of individuals, their sex, the duration of their monitoring, the fix rate, the number of missing data, etc.
+Now that the data set is more manageable, we can explore the data, and especially look at the number of individuals, the duration of their monitoring, the fix rate, the number of missing data, etc.
 
 However, as movement data is a time series, it is important when manipulating to FIRST order it by Individual and Time. The function `arrange` from the `plyr` (or `dplyr`) package is very handy:
 
@@ -80,168 +82,164 @@ However, as movement data is a time series, it is important when manipulating to
 elk_df <- elk_df |> plyr::arrange(id, datetime)
 ```
 
-Here, we walk through a sequence of some basic questions to be asked of movement data. s
+Here, we walk through a sequence of some basic questions:
 
 ### How many individuals are there?
 
-And what are their ID?
+And what are their unique ID's?
 
 ```{r IDs}
 length(unique(elk_df$id)) 
 unique(elk_df$id)
 ```
 
-### How many females/males?
-
-There are several "base" R ways to count the males and females. For example the following three commands all give (essentially) the same output:
-
-```{r, eval = FALSE}
-unique(elk_df[,c("sex","ID")])
-unique(data.frame(elk_df$sex, elk_df$ID))
-with(elk_df, unique(data.frame(sex, ID)))
-```
-
-```{r, echo = FALSE}
-with(elk_df, unique(data.frame(sex, ID))) %>% kable
-```
-
-i.e., a unique combination of sex and ID. An (uninteresting) count of those sexes is given by:
-
-```{r}
-id.sex.count <- unique(elk_df[,c("sex","ID")])
-table(id.sex.count$sex)
-```
-
-A more trendy approach is to use functions in the `dplyr` package, which allows you to summarize information per group.
-
-```{r sex}
-elk_df %>% group_by(ID) %>% summarize(sex = unique(sex))
-```
-
-The resulting object is a tibble which is very similar to a data frame, but the preferred output of `dplyr` manipulations.
-
 ### How many locations per individual?
 
-To look at the average number of GPS locations per individual and other statistics (*e.g.*, standard deviation), by using the `mean()`, `sd()`, and related functions.
+To look at the average number of GPS locations per individual and other statistics (*e.g.*, standard deviation), we can use the `mean()`, `sd()`, and related functions.
 
-But first, we want to make sure that there are no missing locations (missing Longitude or Latitude), in this data set. `is,na()` checks whether each element is an NA or not, and `table()` just counts:
+But first, we want to make sure that there are no missing locations (missing Longitude or Latitude), in this data set. `is.na()` checks whether each element is an NA or not, and `table()` just counts:
 
 ```{r}
 # missing longitude
-table(is.na(elk_df$Lon))
+table(is.na(elk_df$lon))
 
 # missing latitude
-table(is.na(elk_df$Lat))
+table(is.na(elk_df$lat))
 ```
 
-No missing locations! That's a relief.
+They are all FALSES so no missing locations! That's a relief.
 
-Let's look at the number of locations per individual:
+Let's look at the average and standard deviation of the number of locations per individual:
 
 ```{r stats}
 # average number of GPS locations per individual
-table(elk_df$ID) %>% mean
+table(elk_df$id) |> mean()
 
 # standard deviation of the number of locations per individual
-table(elk_df$ID) %>% sd
+table(elk_df$id) |> sd()
 ```
 
-On average, an individual has more than 9000 locations. However, the standard deviation is almost as big, which means that some individuals have a lot of locations and some have fewer locations.
+On average, an individual has more than 4000 locations. However, the standard deviation is almost as big, which means that some individuals have a lot of locations and some have fewer locations.
+
+We can also look at the maximum and minimum number of locations per individual, using the `max` and `min` functions:
 
 ```{r}
 # maximum number of GPS locations per individual
-table(elk_df$ID) %>% max
+table(elk_df$id) |> max()
 
 # minimum number of GPS locations per individual
-table(elk_df$ID) %>% min
+table(elk_df$id) |> min()
 ```
+That's a big range! We may want to select for individuals with a minimum number of locations later.
 
-You can also access (almost) all the statistics by applying the all-purpose `summary()` function to the `table()` of the ID. Note that you need to convert it to a data frame first\[\^1\]: \[\^1\] The output of `table()` in R is actually quite weird.
+You can also access (almost) all of the statistics by applying the all-purpose `summary()` function to the `table()` for each individual. 
+
+Note that you need to convert it to a data frame first.
 
 ```{r}
 # summary of the number of GPS locations per individual
-table(elk_df$ID) %>% data.frame %>% summary
+table(elk_df$id) |> data.frame() |> summary()
 ```
 
 ### What is the duration of monitoring?
 
-The functions `min()`, `max()` and `range()` are self-explanatory, but importantly work excellenty with properly formatted time objects. The `diff()` function calculates differences among subsequent elements of a vector. But for time (POSIX) data, it is best to use the `difftime(t1, t2)` function since that allows you to specify the units of the time difference (hours, days, etc.) Otherwise, strange things can happen. For example, the overall time span of the monitoring effort is:
+The functions `min()`, `max()` and `range()` are self-explanatory, but importantly work excellenty with properly formatted time objects. 
+
+The `diff()` function calculates differences among subsequent elements of a vector. But for time (POSIX) data, it is best to use the `difftime(t1, t2)` function, since that allows you to specify the units of the time difference (hours, days, etc.) Otherwise, strange things can happen. 
+
+For example, the overall time span of the monitoring effort for the individual "GP1" one is:
 
 ```{r}
-range(diff(elk_df$Time))
+GP1 <- subset(elk_df, id =="GP1")
+
+range(diff(GP1$datetime))
 ```
 
-The number of seconds is not SO helpful. But `difftime` is a bit more useful:
+The units returned (hours) is not helpful.
+
+But `difftime` is a bit more useful:
 
 ```{r}
-difftime(max(elk_df$Time), min(elk_df$Time), units = "days")
+difftime(max(GP1$datetime), min(GP1$datetime), units = "days")
 ```
 
-Better. That's a lot of days. More than 10 years. Years is not an option with `difftime`, but to manipulate the output statistically, you need to convert to numeric. Thus the number of years
+This individual has a pretty short track!
+
+We can also look at the time range of the entire dataset:
 
 ```{r}
-(difftime(max(elk_df$Time), min(elk_df$Time), units = "days") %>% as.numeric)/365.25
+difftime(max(elk_df$datetime), min(elk_df$datetime), units = "days")
 ```
 
-That's a good, long-term dataset!
 
-Anyways, what we really want is to figure this out for each individual. One approach is to use `plyr::ddply` commands. This function allows you apply functions to different groups (subsets) of a data set. Here's an example:
+Days is not as helpful as years.
+
+Years is not an option with `difftime`, but to manipulate the output statistically, you need to convert to numeric. Thus the number of years for the entire dataset is:
+
+```{r}
+(difftime(max(elk_df$datetime), min(elk_df$datetime), units = "days") |> as.numeric())/365.25
+```
+
+~ 3 years (not bad!)
+
+What we really want is to figure this out for each individual, all at once. One approach is to use the `plyr::ddply` command. This function allows you to apply functions to different groups (subsets) of a data set. Here's an example:
 
 ```{r, eval = FALSE}
-elk_df %>% ddply("ID", plyr::summarize, 
-                 start= min(Time), end = max(Time)) %>% 
+elk_df |> ddply("id", plyr::summarize, 
+                 start= min(datetime), end = max(datetime)) %>% 
   mutate(duration = difftime(end, start, units = "days"))
 ```
 
 ```{r, echo = FALSE}
-elk_df %>% ddply("ID", plyr::summarize, 
-                 start= min(Time),
-                 end = max(Time)) %>% 
-  mutate(duration = difftime(end, start, units = "days")) %>% 
-  head %>% kable
+elk_df |> ddply("id", plyr::summarize, 
+                 start= min(datetime),
+                 end = max(datetime)) |> 
+  mutate(duration = difftime(end, start, units = "days")) |>
+  head() |> kable()
 ```
 
-The (near) equivalent with `dplyr` commands - just jumping straight to the duration:
+The (near) equivalent with `dplyr` commands, but just for duration:
 
 ```{r}
-elk_df %>% group_by(ID) %>% 
-  dplyr::summarize(duration = difftime(max(Time), min(Time), units = "days")) 
+elk_df |> group_by(id) |>
+  dplyr::summarize(duration = difftime(max(datetime), min(datetime), units = "days")) 
 ```
 
 To get statistical summaries of these durations, you have to convert the time range object (which is a unique `difftime` class) into numeric. Thus:
 
 ```{r}
-elk_df %>% group_by(ID) %>% 
-  dplyr::summarize(time_range = difftime(max(Time), min(Time), units ="days") %>% 
-                     as.numeric) %>% summary
+elk_summary <- elk_df |> group_by(id) |> 
+  dplyr::summarize(time_range = difftime(max(datetime), min(datetime), units ="days"))
+
+elk_summary$time_range |> as.numeric() |> summary()
 ```
 
-The median duration of monitoring is \~300 days, or a little bit less than a year. Some individual(s) have \~3 years of monitoring, and some only a few days.
+The median duration of monitoring is \~270 days, less than a year. Some individual(s) have \~3 years of monitoring, and some only a few days.
 
 We can visualize the monitoring duration for each individual, on a plot, by extracting the start date and the end date of the monitoring for each individual.
 
 ```{r Timerange}
-n.summary <- elk_df %>% group_by(ID) %>% 
-  summarize(start = min(Time), end = max(Time)) 
+n.summary <- elk_df |> group_by(id) |> 
+  summarize(start = min(datetime), end = max(datetime)) 
 ```
 
 Here's a version using `ggplot2`
 
 ```{r elkDurations}
 require(ggplot2)
-ggplot(n.summary, aes(y = ID, xmin = start, xmax = end)) + 
+ggplot(n.summary, aes(y = id, xmin = start, xmax = end)) + 
     geom_linerange() 
 ```
 
-It may make more sense to sort the individuals not alphabetically, but by the time of release. Here's an approach, which relies on reordering the factor levels of the ID column (an often fussy task):
+It may make more sense to sort the individuals not alphabetically, but by the time of release. Here's an approach, which relies on reordering the factor levels of the id column (an often fussy task):
 
 ```{r}
-n.summary <- elk_df %>% group_by(ID) %>% 
-  summarize(start = min(Time), end = max(Time)) %>% 
-  arrange(start) %>% 
-  mutate(ID = factor(ID, levels = as.character(ID)))
+n.summary <- elk_df |> group_by(id) |> 
+  summarize(start = min(datetime), end = max(datetime)) %>% 
+  arrange(start) |> 
+  mutate(id = factor(id, levels = as.character(id)))
   
-ggplot(n.summary, aes(y = ID, xmin = start, xmax = end)) + 
+ggplot(n.summary, aes(y = id, xmin = start, xmax = end)) + 
     geom_linerange() 
 ```
 
@@ -250,10 +248,10 @@ This is quick and easy and attractive enough. But, for the record, if you wanted
 ```{r basePlotDurations, echo = -1}
 par(bty = "l", tck = 0.01, mgp = c(1,.25,0), mar = c(2,5,1,1), cex.axis = 0.8)
 with(n.summary, {
-  plot(start, ID, xlim = range(start, end), 
+  plot(start, id, xlim = range(start, end), 
        type = "n", yaxt = "n", ylab = "", xlab = "")
-  segments(start, as.integer(ID), end, as.integer(ID), lwd = 2)
-  mtext(side = 2, at = 1:nrow(n.summary), ID, cex = 0.7, las = 1, line = .2)
+  segments(start, as.integer(id), end, as.integer(id), lwd = 2)
+  mtext(side = 2, at = 1:nrow(n.summary), id, cex = 0.7, las = 1, line = .2)
   })
 ```
 
@@ -262,13 +260,13 @@ In any case, on this figure each line represents the duration of the monitoring 
 To see if there is one or multiple gaps, we can create a vector of Date for each individual (i.e., containing only the date and not the time, to simplify the it and get only get one row per day per individual). To get the date from a time vector, we use the `as.Date` function. We then use the `slice()` command to keep only row per day for each individual. Do not forget to arrange per ID and date as all these manipulation can sometimes mess up the ordering of your data.
 
 ```{r}
-elk_days <- elk_df %>% mutate(date = as.Date(Time)) %>% 
-  group_by(ID, date) %>% 
-  slice(1) %>% arrange(ID, date) 
+elk_days <- elk_df |> mutate(date = as.Date(datetime)) |>
+  group_by(id, date) |>
+  slice(1) |> arrange(id, datetime) 
 ```
 
 ```{r, elkDurationPlotWithGaps}
-ggplot(elk_days, aes(y = ID, x = date)) + 
+ggplot(elk_days, aes(y = id, x = datetime)) + 
     geom_point(shape = 20, size = .5, alpha = .1) 
 ```
 
@@ -279,42 +277,47 @@ Similar to the previous figure, each line represent the monitoring dates for a g
 The fix rate, or the time lag between successive locations, can be extracted by using the `difftime()` function on the `Time` column. Again, this function needs to be applied to each individual separately. Here, we are subsetting the data set per ID, and applying a function which is adding a column *difftime* to each subset. Note that since the vector of time difference is smaller than the vector of time, we add a missing value at the beginning of each vector, for each value to represent the difference in time to the previous location.
 
 ```{r, eval = FALSE}
-elk_df <- elk_df %>% ddply("ID", mutate, 
-        dtime = c(NA, difftime(Time[-1], Time[-length(Time)], units = "hours")))
+elk_df <- elk_df |> ddply("id", mutate, 
+        dtime = c(NA, difftime(datetime[-1], datetime[-length(datetime)], units = "hours")))
 ```
 
 ```{r, echo = FALSE}
-head(elk_df) %>% kable
+head(elk_df) |> kable()
 ```
 
 What are the statistics (min, max, mean, median, ...) of this fix rate?
 
 ```{r}
-elk_df$dtime %>% summary
+elk_df$dtime |> summary()
 ```
 
-On average, the fix rate is \~1 hour (median is 15 minutes). The smallest one is 1 second and the biggest is a little more than a year (10664 hours \~ 178 days). This one probably comes from an animal that has been captured and equipped once, then recaptured a year after the end of the monitoring. Understanding the sources of these gaps underscores the importance of having a relationship with those people that actually collected the data, to understand their monitoring strategy and structure of the data, and understand how to process the data depending on your research questions.
+On average, the fix rate is \~1 hour (median is also around 1 hour). 
 
-## Processing data
+The range from 0.01 hours to over 1,000 hours highlights the importance of understanding the sources of gaps in your data. This understanding often needs to come from having a relationship with the people that actually collected the data (unless if was you of course!), to understand their monitoring strategy and structure of the data, and to understand how to process the data depending on your research questions.
+
+## More Data Processing
 
 The previous section illustrated a few typical approaches to *exploring* a movement dataset. *Processing* the data - broadly speaking - implies that we will be organizing it, filtering it, or adding information to the data frame in ways that contributes in a meaningful way to some key research question. By that definition, for example, the inclusion of the individual specific fix rate above is a key bit of *data processing*.
 
-As an example, we might investigate the following question: *Is there a difference in movement rates between winter and summer, for female elk?*
+As an example, we might investigate the following question: *Is there a difference in the movement rates between winter and summer, for elk?*
 
-### Subsetting by season
+### Subsetting by Season
 
-To answer this question, we need to focus on movement data of female elk during winter and summer only. Let's say (arbitrarily) that winter is only January and February, and summer is just July and August. We can use `month()` to subset the data accordingly.
+To answer this question, we need to focus on movement data of elk during winter and summer only. Let's say (arbitrarily) that winter is only January and February, and summer is just July and August. We can use `month()` to subset the data accordingly.
 
 ```{r filterseasons}
-elk_winter_summer <- elk_df %>% mutate(Month = month(Time)) %>%
+elk_winter_summer <- elk_df |> mutate(Month = month(datetime)) |>
   subset(Month %in% c(1,2,6,7))
+
+str(elk_winter_summer)
 ```
 
 To add a column "season", we can use the `ifelse()`, function which returns different values depending on whether a given element in a vector satisfies a condition.
 
 ```{r addSeason}
-elk_winter_summer <- elk_winter_summer %>% 
+elk_winter_summer <- elk_winter_summer |> 
   mutate(season = ifelse(Month < 3, "Winter", "Summer"))
+
 table(elk_winter_summer$season)
 ```
 
@@ -330,15 +333,17 @@ season.dates
 
 ```{r}
 cut.dates <- c(season.dates, 367)
-elk_winter_summer <- elk_df %>% 
-  mutate(season = cut(yday(Time), cut.dates, labels = c("winter","other","summer","other"))) %>% 
-  subset(season != "other") %>% droplevels
+
+elk_winter_summer <- elk_df |>
+  mutate(season = cut(yday(datetime), cut.dates, labels = c("winter","other","summer","other"))) |> 
+  subset(season != "other") |> droplevels()
+
 table(elk_winter_summer$season)
 ```
 
-### Estimating movement rate
+### Estimating the Movement Rate
 
-To estimate the movement rate between subsequent steps for each individual and each season, we will use what we learned in chapter @sec-complexnumbers.
+To estimate the movement rate between subsequent steps for each individual and each season, we will use what we learned in our lab on Complex Numbers.
 
 1.  Create a Z vector combining the X and Y coordinates
 2.  Calculate the step lengths (SL)
@@ -351,9 +356,9 @@ As we need to do this for each individual, year and season separately, we will u
 getMoveStats <- function(df){
   # df - is a generic data frame that will contain X,Y and Time columns
   Z <- df$X + 1i*df$Y
-  Time <- df$Time
+  Time <- df$datetime
   Step <- c(NA, diff(Z)) # we add the extra NA because there is no step to the first location
-  dT <- c(NA, difftime(Time[-1], Time[-length(Time)], hours) %>% as.numeric)
+  dT <- c(NA, difftime(Time[-1], Time[-length(Time)], hours) |> as.numeric())
   
   SL <- Mod(Step)/1e3 # convert to km - so the speed is in km/hour
   MR <- SL/dT # computing the movement rate
@@ -366,53 +371,36 @@ getMoveStats <- function(df){
 We took care to pick this function apart into individual pieces. And understand that it returns a new data frame with the additional columns appended to the original data frame. THe `ddply` command will apply this function to every individual in every season in every year. This is now very quick:
 
 ```{r SL}
-elk_winter_summer <- elk_winter_summer %>% 
-  plyr::ddply(c("ID", "Year", "season"), getMoveStats)
+elk_winter_summer <- elk_winter_summer |> 
+  plyr::ddply(c("id", "Year", "season"), getMoveStats)
 ```
 
 ```{r, echo = FALSE}
-elk_winter_summer %>%  head %>% kable
+elk_winter_summer |>  head() |> kable()
 ```
 
-### Quick analysis of movement rates
+### Quick analysis of Movement Rates
 
 We are ready now (finally) to answer the question: **Is there a difference in movement rate between winter and summer?** We can start with a quick boxplot of the movement rates against individual ID's and season. The distributions are highly skewed and quite variable, with some animals really on the move, and some spending a lot of time not moving at all.
 
 ```{r ggplotMovementRates, fig.width= 8}
-ggplot(elk_winter_summer, aes(ID, MR)) + geom_boxplot() + facet_wrap(.~season)
+ggplot(elk_winter_summer, aes(id, MR)) + 
+  geom_boxplot() + 
+  facet_wrap(.~season)
 ```
 
 Some season & individual summary stats:
 
 ```{r mr_summarystats}
-mr_summarystats <- elk_winter_summer %>% ddply(c("ID","season"), summarize,
+mr_summarystats <- elk_winter_summer |>
+  ddply(c("id","season"), summarize,
   min = min(MR, na.rm = TRUE), max = max(MR, na.rm = TRUE),
   n = length(MR), NA.count = sum(is.na(MR)),
   Zero.count = sum(MR == 0, na.rm = TRUE))
 ```
 
 ```{r, echo = FALSE}
-mr_summarystats %>% kable
+mr_summarystats |> kable()
 ```
 
-Note there are lot of 0's in the data, which is rather remarkable considering the relative imprecision of GPS data - certainly high enough to show variation at the 1 meter scale. This is an evident <font color = "red"> red flag </font> ... one might be inclined to simply remove those data entirely.
-
-Without going into too much detail of the statistical analysis of these data, the most appropriate statistical test would use a linear mixed effects model with individuals as random effects, and look something like this:
-
-```{r}
-fit <- lme4::lmer(log(MR) ~ season + (1 + season|ID), 
-            data = elk_winter_summer %>% subset(MR != 0 & !is.na(MR)))
-summary(fit)
-```
-
-Movement rates are slightly lower in the summer - but, perhaps surprisingly, not with meaningful statistical significance (\|$t$ value\| \< 1).
-
-Note that the residuals are quite well-behaved with the log-transformation.
-
-```{r residuals, fig.height = 3}
-plot(fit)
-```
-
-## Conclusions
-
-## References
+Our output helpfully shows the number of NA's and zeros for each individual and by the season. Individuals with many 0's or NA's may warrant further investigation or even dropping from your dataset. 
