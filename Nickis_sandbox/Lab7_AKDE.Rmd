@@ -1,0 +1,319 @@
+---
+title: 'L4: Home Range Analyses'
+author: "Nicole Barbour"
+date: "2024-05-15"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
+
+```
+
+# Introduction: How is an AKDE different/better than KDE?
+
+If you have autocorrelated data, as is the case with pretty much any movement data collected via biotelemetry (tags), then “regular” home range estimation techniques (e.g., minimum convex polygon, low convex hull, kernel density estimators) are likely to either *over* or *underestimate* home ranges for your data (Fleming et al 2015, DOI: https://doi.org/10.1890/14-2010.1). 
+
+The CTMM R package was developed for dealing with autocorrelated data and applying continuous (versus the traditionally more popular, discrete) time movement models that could then be used to effectively estimate home ranges with the autocorrelated kernel density estimator (AKDE) technique (Calabrese et al 2016, DOI: 10.1111/2041-210X.12559). 
+
+The CTMM package has also been further developed to do even fancier home range estimation techniques, with the ability to both reduce bias from maximum likelihood (ML) variance estimation and deal with both small absolute and effective sample sizes, using perturbative hybrid restricted maximum likelihood estimation (pHREML) and area-corrected autocorrelated kernel density estimation (AKDEc) techniques (Fleming et al 2019, DOI: 10.1111/2041-210X.13270).
+
+The steps for estimating the home range of an individual with the CTMM package are (generally):
+
+1 - Ensure your data is in the correct format for the package and has been effectively cleaned of outliers and problematic observations
+
+2 - Calculate the semi-variance function (SVF) to visualize the autocorrelation structure as the average square distance (Y-axis) traveled versus a given time lag (X-axis) - the asymptote represents the time lags at which the data can be considered to be “independent” (no longer autocorrelated) - animals with range residency will demonstrate a strong asymptote
+
+3 - Determine a suite of candidate movement process or continuous time movement models (CTMMs) and chose the “best” one (using ML or pHREML) to fit to the data - further description of the different possible model types can be found in Calabrese et al (2016) - the package actually determines candidate models and selects the best one for you
+
+4 - Estimate the home range area (with 95% confidence intervals) using AKDE or AKDEc
+
+5 - Check the outputs for issues: very large home range area estimates, very small effective sample sizes (< 6, defined as the number of times the animal could have crossed the linear extent of its range within its observation period) or large expected order of biases (> 1 %) could require parametric bootstrapping (Silvas 2021)
+
+
+# Load Data In
+
+We will load in our processed elk data from lab 1 and select the same 3 residential individuals we used for the MCP and KDE analysis. 
+
+```{r}
+load("./data/elk_processed.rda")
+```
+
+
+```{r}
+elk_res <- elk_processed |>
+  dplyr::filter(id %in% c("YL80", "YL91", "YL94"))
+```
+
+
+# Convert Data to CTMM Format
+
+Our data needs to converted to a CTMM-friendly “telemetry” object, which is the same format used for Movebank data. Columns needed are: id, datetime, latitude, and longitude. Names of columns need to match the required format (see below).
+
+```{r}
+elk_res2 <-  elk_res |> dplyr::select(id, datetime, lat, lon)
+
+names(elk_res2) <- c("individual.local.identifier","timestamp","location.lat","location.long")
+```
+
+
+We use the “as.telemetry” function to prepare the data for the CTMM package. The “summary” function then allows you to get a quick summary of the data, similar to what we did above.
+
+Note: although you can specify a projection within the “as.telemetry” function, if none is specified, a “a two-point equidistant projection” is applied that is sufficient for most species (see “help(as.telemetry)”).
+
+```{r}
+library(ctmm)
+```
+
+```{r}
+
+elk_ctmm <- as.telemetry(elk_res2)
+
+summary(elk_ctmm)
+```
+
+# Fit CTMM Models to Data
+
+Next, we use the `ctmm.guess` and `ctmm.select` functions to “guess” and then select the “best” CTMM models for each individual.
+
+We also use the “pHREML” method to fit each individual model, as it “*combines the bias correction of Restricted Maximum Likelihood and stability of Maximum Likelihood*” (Silva 2021). It is also suitable for data with small effective sample sizes.
+
+We can write a function to efficiently perform the "guess" and "fitting" of our CTMM models on our elk ctmm object, using the `lapply` function.
+
+
+```{r eval=FALSE}
+fitCTMM <- function(ctmm_object){
+  
+  guess <- ctmm.guess(ctmm_object, interactive=FALSE)
+  
+  ctmm_fit <- ctmm.select(ctmm_object, guess, method="pHREML", cores=0)
+  
+  return(ctmm_fit)
+}
+```
+
+```{r eval=FALSE}
+elk_ctmm_fit <- lapply(elk_ctmm,
+  fitCTMM
+)
+```
+
+
+One of the downsides of the CTMM package is that it can be memory-intensive. You can use parallel-processing with the "future.apply" package to run the functions more efficiently using a set number of cores on your computer.
+
+*Note*: you need to be sure to run the `plan(multisession)` before running in parallel to start the parallel session and THEN run the `plan(sequential)` function to shut down the parallel processing workers.
+
+
+```{r}
+library(future.apply)
+```
+
+```{r eval=FALSE}
+plan(multisession)
+
+elk_ctmm_fit <- future_lapply(elk_ctmm,
+                             FUN = fitCTMM)
+
+plan(sequential)
+```
+
+
+We can also create a function to get the predicted models for each individual ctmm object:
+
+```{r}
+extractCTMMSummary <- function(ctmm_fit_object){
+  ctmm_predict <- summary(ctmm_fit_object[[i]])$name
+  
+  return(ctmm_predict)
+}
+```
+
+
+```{r eval=FALSE}
+
+elk_ctmm_predict <- lapply(elk_ctmm_fit,
+                           extractCTMMSummary)
+
+```
+
+
+
+```{r include=FALSE}
+#save(elk_ctmm_predict, elk_ctmm_fit, file="./data/ctmm_elk.rda")
+
+load(file="./data/ctmm_elk.rda")
+```
+
+# Plot Semi-Variograms
+
+The `variogram` function calculates the empirical variogram, which allows you to assess the autocorrelation structure of the data. 
+
+Animals with range-resident movements will generally have an increase in the semi-variance at smaller time lags, then peak and “level off” or plateau as they reach the limits of their range.
+
+We can write a for-loop for to create our plots for each individual, using our ctmm and fitted ctmm model objects. 
+
+The different colored lines represent the empirical track data (*black*) and what’s expected based on their fitted CTMM models (*red*).
+
+```{r}
+for (i in 1:length(elk_ctmm)){
+  
+  SVF <- variogram(elk_ctmm[[i]])
+  
+  plot(SVF, CTMM = elk_ctmm_fit[[i]])
+  
+  title(paste("Track ID:", names(elk_ctmm)[i]))
+}
+
+```
+
+# Calculate AKDEc Homeranges
+
+Now that we have “best” estimated the movement process for each individual by fitting the most appropriate continuous time movement model, we can estimate the home range for each individual, using the area-corrected autocorrelated kernel density estimation (AKDEc) method. 
+
+The `akde` function from the CTMM package outputs the home range size estimation (with 95% confidence intervals), effective sample size, and absolute sample size for each individual.
+
+We can use a for-loop for to create the homerange estimates for each individual, using our ctmm and fitted ctmm model objects, and saving the results to a list object, with each element being an individual homerange estimate.
+
+```{r}
+
+elk_homerange<-c()
+
+for (i in c(1:length(elk_ctmm_predict))){
+  
+  elk_homerange[[i]] <- akde(elk_ctmm[[i]], elk_ctmm_fit[[i]])
+  
+}
+```
+
+# Visualize AKDEc Homeranges
+
+We can now plot our estimated homeranges with the locations on top:
+
+```{r}
+for (i in c(1:length(elk_ctmm))){
+  
+  plot(elk_ctmm[[i]], UD = elk_homerange[[i]])
+  
+  title(paste(names(elk_ctmm)[i],"pHREML AKDEc"))
+}
+
+```
+
+For further visualization, we can use the `lapply` function with the `SpatialPolygonsDataFrame.UD` function to convert our list of homeranges to be spatial polygons.
+
+
+```{r}
+
+elk_homerange_poly <- lapply(elk_homerange,
+                             SpatialPolygonsDataFrame.UD)
+
+names(elk_homerange_poly) <- names(elk_ctmm)
+
+```
+
+The mapview package can then be used to visualize the estimated homeranges:
+
+```{r}
+library(mapview)
+```
+
+
+```{r}
+mapview(elk_homerange_poly, map.types="Esri.WorldImagery", legend=FALSE, cex=2, lwd=0.1)
+```
+
+# Create "Fancy" DataTable with Estimates
+
+Finally, we can create a "fancy" datatable that shows the estimated home range area, effective sample size, absolute sample size, chosen (fitted) CTMM model, and expected order of bias for each individual.
+
+Here, we also want to check for any issues (extremely large home ranges, very small effective sample sizes, high orders of bias).
+
+We use the “formattable” R package to create our data table:
+
+```{r}
+library(formattable)
+```
+
+
+```{r}
+area <- c()
+eff_n <- c()
+abs_n <- c()
+bias <- c()
+
+for (i in c(1:length(elk_ctmm_predict))){
+  area[[i]] <- summary(elk_homerange[[i]])$CI[2]
+  eff_n[[i]] <- summary(elk_homerange[[i]])$DOF[1]
+  abs_n[[i]] <- nrow(elk_ctmm[[i]])
+  bias[[i]] <- 1/summary(elk_homerange[[i]])$DOF['area']^2
+}
+
+area2 <- do.call("rbind",area)
+eff_n2 <- do.call("rbind",eff_n)
+abs_n2 <- do.call("rbind",abs_n)
+bias2 <- do.call("rbind",bias)
+predict <- do.call("rbind",elk_ctmm_predict)
+
+data_table <- data.frame(ID = names(elk_ctmm))
+
+data_table$area <- area2[,1]
+data_table$eff_n <- eff_n2[,1]
+data_table$abs_n <- abs_n2[,1]
+data_table$ctmm_model <- predict[,1]
+data_table$bias <- bias2[,1]*100
+
+data_table[,c(2:3,6)] <- signif(data_table[,c(2:3,6)], digits=2)
+
+data_table$bias <- sub("0+$","",data_table$bias)
+
+data_table$bias <- format(data_table$bias,scientific=FALSE)
+
+
+colnames(data_table)[1] <- "ID Name"
+colnames(data_table)[2] <- "Estimated Home Range Area (square km)"
+colnames(data_table)[3] <- "Effective Sample Size"
+colnames(data_table)[4] <- "Absolute Sample Size (No. of Obs)"
+colnames(data_table)[5] <- "Fitted CTMM Model"
+colnames(data_table)[6] <- "Expected Order of Bias (%)"
+
+formattable(data_table, align = c("l", rep("r", NCOL(data_table) - 1)))
+```
+
+
+# Find Population/Group-Level Homerange
+
+As a bonus, we can use the ctmm package functions to calculate the population or group-level homerange area (and plot all of the estimates and areas).
+
+First we use the `akde` function on all of the ctmm and model fit objects at once:
+
+```{r results='hide'}
+elk_akdes_all <- akde(elk_ctmm, elk_ctmm_fit, trace=1)
+```
+
+Then we can use the `meta` function to determine the median home range size (with confidence intervals) across all individuals. 
+
+```{r}
+col <- color(elk_akdes_all, by = 'individual')
+
+plot(elk_akdes_all, col.DF = col, col.level = col,col.grid = NA, level=NA)
+```
+
+We can also plot all AKDEc home ranges and color by individual:
+
+
+```{r}
+meta(elk_akdes_all, col = c(col,'black'), sort=TRUE)
+```
+
+
+
+
+
+
+
+

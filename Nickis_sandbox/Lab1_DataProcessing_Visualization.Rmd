@@ -163,7 +163,7 @@ The "[]" operator can be used to grab specific columns by their number in a data
 Let's drop the 4th and 5th columns from our "elk_gps" dataset.
 
 ```{r}
-elk_gps <- elk_gps[, -c(4:5)]
+elk_gps <- elk_gps[, -c(1, 5:6)]
 
 str(elk_gps)
 ```
