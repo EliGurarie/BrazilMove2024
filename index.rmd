@@ -74,18 +74,19 @@ The outline of the course below is approximate.  We'll be posting links to mater
 Please come prepared with 2-3 slides to introduce yourself, your study system, your ecological questions, and a brief description of your data. 
 </font>
 
-### Topic: Processing Movement Data**
+### Topic: Processing Movement Data
 
 - [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
 
-- [**R** Lab](Day1/02_ProcessingData/Lab1_DataProcessing.html) 
+- [**R** Lab](Day1/02_ProcessingData/Lab1_DataProcessing.html) ([code](Day1/02_ProcessingData/Lab1_DataProcessing.R))
   - data here: [Elk_GPS_data.csv](data/Elk_GPS_data.csv) (right-click to download)
   
 **Guest Lecture from [Sarah Davidson](https://www.ab.mpg.de/person/98230/2736)** - from [Movebank](https://www.movebank.org/cms/movebank-main) 
 
-### Topic: Visualizing Movement Data**
+### Topic: Visualizing Movement Data
 
-- [**R** Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html)
+- [**R** Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html) ([code](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.R))
+
 
 ## Day 2: Tuesday, May 21
 

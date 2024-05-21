@@ -1,11 +1,13 @@
 ---
 title: "Statistical Summaries" 
-subtitle: "Loading, exploring and processing"
-authors: "N. Barbour,, E. Gurarie"
-editor: 
-  mode: source
-execute:
-  freeze: true
+author: "Nicki Barbour and Elie Gurarie"
+subtitle: "[Brazil Move 2024 - UFMS - Campo Grande](https://eligurarie.github.io/BrazilMove2024)"
+date: "May 20, 2024" 
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
 ---
 
 ```{r setup, include=FALSE}
@@ -109,75 +111,76 @@ table(is.na(elk_df$lat))
 
 They are all FALSES so no missing locations! That's a relief.
 
-Let's look at the average and standard deviation of the number of locations per individual:
+Here's the number of total observations per individual:
+
+```{r, echo = 2, eval = 1}
+table(elk_df$id) |> data.frame()
+table(elk_df$id)
+```
+
+And some summary statistics:
+
+mean
 
 ```{r stats}
-# average number of GPS locations per individual
-table(elk_df$id) |> mean()
-
-# standard deviation of the number of locations per individual
-table(elk_df$id) |> sd()
+mean(table(elk_df$id))
 ```
 
-On average, an individual has more than 4000 locations. However, the standard deviation is almost as big, which means that some individuals have a lot of locations and some have fewer locations.
+standard deviation
 
-We can also look at the maximum and minimum number of locations per individual, using the `max` and `min` functions:
+```{r stats}
+sd(table(elk_df$id))
+```
+
+minimum and maximum
 
 ```{r}
-# maximum number of GPS locations per individual
-table(elk_df$id) |> max()
-
-# minimum number of GPS locations per individual
-table(elk_df$id) |> min()
+min(table(elk_df$id))
+max(table(elk_df$id))
 ```
-That's a big range! We may want to select for individuals with a minimum number of locations later.
-
-You can also access (almost) all of the statistics by applying the all-purpose `summary()` function to the `table()` for each individual. 
-
-Note that you need to convert it to a data frame first.
+and all that stats together using `summary()` (but you need to convert to vector first):
 
 ```{r}
-# summary of the number of GPS locations per individual
-table(elk_df$id) |> data.frame() |> summary()
+summary(as.numeric(table(elk_df$id)))
 ```
+
+And histogram:
+
+```{r}
+hist(table(elk_df$id))
+```
+
 
 ### What is the duration of monitoring?
 
-The functions `min()`, `max()` and `range()` are self-explanatory, but importantly work excellenty with properly formatted time objects. 
+The functions `min()`, `max()` and `range()` are self-explanatory, but importantly work excellently with properly formatted time objects. 
 
-The `diff()` function calculates differences among subsequent elements of a vector. But for time (POSIX) data, it is best to use the `difftime(t1, t2)` function, since that allows you to specify the units of the time difference (hours, days, etc.) Otherwise, strange things can happen. 
+The `diff()` function calculates differences among subsequent elements of a vector, or, for time (POSIX) data, the `difftime(t1, t2)` function will compute the difference between two times. 
 
-For example, the overall time span of the monitoring effort for the individual "GP1" one is:
+The overall time span of the monitoring effort for the individual "GP1" one is:
 
 ```{r}
 GP1 <- subset(elk_df, id =="GP1")
-
-range(diff(GP1$datetime))
+diff(range(GP1$datetime))
 ```
-
-The units returned (hours) is not helpful.
-
-But `difftime` is a bit more useful:
+With `difftime` and `diff` you can specify the unit (choose from: `"auto", "secs", "mins", "hours", "days", "weeks"`):
 
 ```{r}
-difftime(max(GP1$datetime), min(GP1$datetime), units = "days")
+diff(range(GP1$datetime), units = "hours")
+difftime(max(GP1$datetime), min(GP1$datetime), units = "weeks")
 ```
-
 This individual has a pretty short track!
 
 We can also look at the time range of the entire dataset:
 
 ```{r}
-difftime(max(elk_df$datetime), min(elk_df$datetime), units = "days")
+diff(range(elk_df$datetime), units = "days")
 ```
-
-
-Days is not as helpful as years.
 
 Years is not an option with `difftime`, but to manipulate the output statistically, you need to convert to numeric. Thus the number of years for the entire dataset is:
 
 ```{r}
-(difftime(max(elk_df$datetime), min(elk_df$datetime), units = "days") |> as.numeric())/365.25
+(diff(range(elk_df$datetime), units = "days") |> as.numeric())/365.25
 ```
 
 ~ 3 years (not bad!)
@@ -186,7 +189,7 @@ What we really want is to figure this out for each individual, all at once. One 
 
 ```{r, eval = FALSE}
 elk_df |> ddply("id", plyr::summarize, 
-                 start= min(datetime), end = max(datetime)) %>% 
+                 start= min(datetime), end = max(datetime)) |>
   mutate(duration = difftime(end, start, units = "days"))
 ```
 
@@ -201,8 +204,10 @@ elk_df |> ddply("id", plyr::summarize,
 The (near) equivalent with `dplyr` commands, but just for duration:
 
 ```{r}
-elk_df |> group_by(id) |>
-  dplyr::summarize(duration = difftime(max(datetime), min(datetime), units = "days")) 
+elk_df |> dplyr::group_by(id) |>
+  dplyr::summarize(start = min(datetime), 
+                   end = max(datetime), 
+                   duration = difftime(end, start, units = "days"))
 ```
 
 To get statistical summaries of these durations, you have to convert the time range object (which is a unique `difftime` class) into numeric. Thus:
@@ -274,11 +279,11 @@ Similar to the previous figure, each line represent the monitoring dates for a g
 
 ### What is the fix rate?
 
-The fix rate, or the time lag between successive locations, can be extracted by using the `difftime()` function on the `Time` column. Again, this function needs to be applied to each individual separately. Here, we are subsetting the data set per ID, and applying a function which is adding a column *difftime* to each subset. Note that since the vector of time difference is smaller than the vector of time, we add a missing value at the beginning of each vector, for each value to represent the difference in time to the previous location.
+The **"fix rate"**, or the time interval between successive locations, can be extracted by using the `difftime()` function on the `Time` column. Again, this function needs to be applied to each individual separately. Here, we are subsetting the data set per ID, and applying a function which is adding a column `difftime()` to each subset. Note that since the vector of time difference is smaller than the vector of time, we add a missing value at the beginning of each vector, for each value to represent the difference in time to the previous location.
 
 ```{r, eval = FALSE}
 elk_df <- elk_df |> ddply("id", mutate, 
-        dtime = c(NA, difftime(datetime[-1], datetime[-length(datetime)], units = "hours")))
+        dtime = c(NA, diff(datetime, units = "hours")))
 ```
 
 ```{r, echo = FALSE}
@@ -301,6 +306,51 @@ The previous section illustrated a few typical approaches to *exploring* a movem
 
 As an example, we might investigate the following question: *Is there a difference in the movement rates between winter and summer, for elk?*
 
+### Estimating the Movement Rate
+
+To estimate the movement rate between subsequent steps for each individual and each season, we will use what we learned in our lab on Complex Numbers.
+
+1.  Create a Z vector combining the X and Y coordinates
+2.  Calculate the step lengths (SL)
+3.  Calculate the time difference of the steps
+4.  Calculate step's movement rate
+
+As we need to do this for each individual, year and season separately, we will use the `ddply()`, as before. Note, that to do this most effectively, it is nice to write our own function that makes all the computations we need. The key in this function is that the movement rate (MR) is the step length divided by the time difference, converted ti km/hour. Here's one such function:
+
+```{r}
+getMoveStats <- function(df){
+  # df - is a generic data frame that will contain X,Y and Time columns
+  Z <- df$X + 1i*df$Y
+  Time <- df$datetime
+  Step <- c(NA, diff(Z)) # we add the extra NA because there is no step to the first location
+  dT <- c(NA, difftime(Time[-1], Time[-length(Time)], hours) |> as.numeric())
+  
+  SL <- Mod(Step)/1e3 # convert to km - so the speed is in km/hour
+  MR <- SL/dT # computing the movement rate
+
+  # this is what the function returns
+  data.frame(df, Z, dT, Step, SL, MR)
+}
+```
+
+We took care to pick this function apart into individual pieces. And understand that it returns a new data frame with the additional columns appended to the original data frame. The `ddply` command will apply this function to every individual in every season in every year. This is now very quick:
+
+```{r SL}
+elk_movestats <- elk_df |> plyr::ddply("id", getMoveStats)
+```
+
+```{r, echo = FALSE}
+elk_movestats |>  head() |> kable()
+```
+
+
+```{r}
+ggplot(elk_movestats, aes(doy, MR)) +
+    geom_point(alpha = 0.1) + geom_smooth() + 
+  ylab("Movement Rate (km/h")  + scale_y_sqrt()
+```
+
+
 ### Subsetting by Season
 
 To answer this question, we need to focus on movement data of elk during winter and summer only. Let's say (arbitrarily) that winter is only January and February, and summer is just July and August. We can use `month()` to subset the data accordingly.
@@ -310,6 +360,13 @@ elk_winter_summer <- elk_df |> mutate(Month = month(datetime)) |>
   subset(Month %in% c(1,2,6,7))
 
 str(elk_winter_summer)
+```
+
+```{r ggplotMovementRates, fig.width= 8}
+ggplot(elk_winter_summer, aes(doy, MR, col = id)) + 
+  geom_point() + geom_smooth() + 
+  ylab("Movement Rate (km/h)") + 
+  coor
 ```
 
 To add a column "season", we can use the `ifelse()`, function which returns different values depending on whether a given element in a vector satisfies a condition.
@@ -341,43 +398,7 @@ elk_winter_summer <- elk_df |>
 table(elk_winter_summer$season)
 ```
 
-### Estimating the Movement Rate
 
-To estimate the movement rate between subsequent steps for each individual and each season, we will use what we learned in our lab on Complex Numbers.
-
-1.  Create a Z vector combining the X and Y coordinates
-2.  Calculate the step lengths (SL)
-3.  Calculate the time difference of the steps
-4.  Calculate step's movement rate
-
-As we need to do this for each individual, year and season separately, we will use the `ddply()`, as before. Note, that to do this most effectively, it is nice to write our own function that makes all the computations we need. The key in this function is that the movement rate (MR) is the step length divided by the time difference, converted ti km/hour. Here's one such function:
-
-```{r}
-getMoveStats <- function(df){
-  # df - is a generic data frame that will contain X,Y and Time columns
-  Z <- df$X + 1i*df$Y
-  Time <- df$datetime
-  Step <- c(NA, diff(Z)) # we add the extra NA because there is no step to the first location
-  dT <- c(NA, difftime(Time[-1], Time[-length(Time)], hours) |> as.numeric())
-  
-  SL <- Mod(Step)/1e3 # convert to km - so the speed is in km/hour
-  MR <- SL/dT # computing the movement rate
-
-  # this is what the function returns
-  data.frame(df, Z, dT, Step, SL, MR)
-}
-```
-
-We took care to pick this function apart into individual pieces. And understand that it returns a new data frame with the additional columns appended to the original data frame. THe `ddply` command will apply this function to every individual in every season in every year. This is now very quick:
-
-```{r SL}
-elk_winter_summer <- elk_winter_summer |> 
-  plyr::ddply(c("id", "Year", "season"), getMoveStats)
-```
-
-```{r, echo = FALSE}
-elk_winter_summer |>  head() |> kable()
-```
 
 ### Quick analysis of Movement Rates
 
@@ -386,17 +407,38 @@ We are ready now (finally) to answer the question: **Is there a difference in mo
 ```{r ggplotMovementRates, fig.width= 8}
 ggplot(elk_winter_summer, aes(id, MR)) + 
   geom_boxplot() + 
-  facet_wrap(.~season)
+  facet_wrap(.~season) + ylab("Movement Rate (km/h)")
 ```
+
+Immediately, we see that there is a dramatic outlier!  Let's explore this a bit:
+
+```{r}
+elk_winter_summer[,c("id","datetime","Month","doy","MR")] |> subset(MR == max(MR, na.rm=TRUE))
+```
+```{r}
+myelk <- elk_winter_summer |> subset(doy == 195 & id == "YL56")
+plot(myelk$Z, type = "o", asp = 1)
+plot(myelk$SL, type = "o")
+```
+
+Probably in the space of 2 hours the elk did not move 30 km!  This location is an error and should be eliminated.  The summary stats help us find errors like that. For now, we'll just remove that row from the data: 
+
+```{r}
+elk_winter_summer <- elk_winter_summer |> subset(SL < 30)
+```
+
 
 Some season & individual summary stats:
 
 ```{r mr_summarystats}
 mr_summarystats <- elk_winter_summer |>
   ddply(c("id","season"), summarize,
-  min = min(MR, na.rm = TRUE), max = max(MR, na.rm = TRUE),
-  n = length(MR), NA.count = sum(is.na(MR)),
-  Zero.count = sum(MR == 0, na.rm = TRUE))
+    min = min(MR, na.rm = TRUE), 
+    max = max(MR, na.rm = TRUE),
+    n = length(MR), 
+    NA.count = sum(is.na(MR)),
+    Zero.count = sum(MR == 0, na.rm = TRUE)
+    )
 ```
 
 ```{r, echo = FALSE}
