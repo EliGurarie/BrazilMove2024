@@ -155,7 +155,7 @@ hist(table(elk_df$id))
 
 The functions `min()`, `max()` and `range()` are self-explanatory, but importantly work excellently with properly formatted time objects. 
 
-The `diff()` function calculates differences among subsequent elements of a vector, or, for time (POSIX) data, the `difftime(t1, t2)` function will compute the difference between two times. 
+The `diff()` function calculates differences among subsequent elements of a vector, or, for time (POSIX) data, the `difftime(t1, t2)` function will compute the difference between two times - or two time vectors. 
 
 The overall time span of the monitoring effort for the individual "GP1" one is:
 
@@ -163,10 +163,11 @@ The overall time span of the monitoring effort for the individual "GP1" one is:
 GP1 <- subset(elk_df, id =="GP1")
 diff(range(GP1$datetime))
 ```
-With `difftime` and `diff` you can specify the unit (choose from: `"auto", "secs", "mins", "hours", "days", "weeks"`):
+Unfortunately, the `diff` function does not recognize time units, which can be important to specify. 
+With `difftime` you can choose from: `"auto", "secs", "mins", "hours", "days", "weeks"`):
 
 ```{r}
-diff(range(GP1$datetime), units = "hours")
+diff(range(GP1$datetime)) # auto-picks hours
 difftime(max(GP1$datetime), min(GP1$datetime), units = "weeks")
 ```
 This individual has a pretty short track!

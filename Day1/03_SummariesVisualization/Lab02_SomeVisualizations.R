@@ -1,8 +1,3 @@
-## ----setup, include=FALSE----------------------------------------------------------------------------------
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
-                      warning = FALSE, cache = TRUE)
-knitr::opts_knit$set(root.dir = '../../')
-
 
 ## ----------------------------------------------------------------------------------------------------------
 library(ggplot2)
@@ -13,6 +8,8 @@ library(sf)
 load("data/elk_processed.rda")
 is(elk_gps)
 is(elk_sf)
+require(mapview)
+mapview(elk_sf)
 
 
 ## ----subsetdata--------------------------------------------------------------------------------------------
@@ -38,14 +35,20 @@ long2UTM <- function(long) (floor((long + 180)/6) %% 60) + 1
 long2UTM(-115)
 
 
+elk_sf |> subset(id == 4049) |> st_transform(32611) |>
+  st_coordinates()
+
 ## ----E4049_xyplot------------------------------------------------------------------------------------------
-E4049.xy <-  elk_sf |> subset(id == 4049) |> st_transform(32611) |> st_coordinates()
+E4049.xy <-  elk_sf |> subset(id == 4049) |>
+  st_transform(32611) |> st_coordinates()
+plot(E4049.xy)
 plot(E4049.xy, asp = 1, type = "o")
 
 
 ## ----addXY-------------------------------------------------------------------------------------------------
 require(sf)
-elk_gps <-  elk_gps |> data.frame(elk_sf |> st_transform(32611) |> st_coordinates())
+elk_gps <-  elk_gps |>
+  data.frame(elk_sf |> st_transform(32611) |> st_coordinates())
 str(elk_gps)
 
 
@@ -81,7 +84,7 @@ scan_track(elk_gps |> subset(id == id[1]))
 
 ## ----------------------------------------------------------------------------------------------------------
 myelk <- elk_gps |> subset(id == id[1])
-scan_track(myelk, x = "X", y = "Y", 
+scan_track(myelk, x = "X", y = "Y",
                  col = topo.colors(nrow(myelk)))
 
 
@@ -112,7 +115,7 @@ ggplot(data = elk_gps, aes(x = lon, y = lat)) +
 ggplot(data = elk_gps, aes(x = lon, y = lat, col = id, group =id)) +
   geom_path(size = 0.5, color = "darkgrey") +
   geom_point() +
-  theme_classic() 
+  theme_classic()
 
 
 ## ----fig.height=9, fig.width=9-----------------------------------------------------------------------------
@@ -151,7 +154,7 @@ load("_ignore/elk_basemap.rda")
 ## ----------------------------------------------------------------------------------------------------------
 ggmap(basemap, extent = "normal") +
   geom_point(data = elk_gps, aes(color=id)) +
-  geom_path(data = elk_gps, aes(color=id)) + 
+  geom_path(data = elk_gps, aes(color=id)) +
   scale_color_brewer()
 
 
@@ -195,9 +198,9 @@ library(mapview)
 
 
 ## ----------------------------------------------------------------------------------------------------------
-elk_tracks <- elk_sf |> 
-  group_by(id) |> 
-  summarize(do_union=FALSE) |> 
+elk_tracks <- elk_sf |>
+  group_by(id) |>
+  summarize(do_union=FALSE) |>
   st_cast("LINESTRING")
 
 

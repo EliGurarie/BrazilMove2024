@@ -261,6 +261,33 @@ rose.diag(Theta, bins=16, col="grey", prop=2, main=expression(Theta))
 > -  the turning angles
 ]
 
+
+---
+
+## Relevent code snippets
+
+
+If `X` and `Y` are coordinates is a track in complex coordinates and `Time` is a POSIX time object:
+
+```{r, eval = FALSE}
+Z <- X + 1i*Y
+Steps <- diff(Z)
+StepLengths <- Mod(Steps)
+Orientation <- Arg(Steps)
+TurningAngles <- diff(Orientation)
+TotalDistance <- sum(StepLengths)
+TimeIntervals <- diff(Time, units = "hours")
+```
+
+
+And some summary statistics
+
+```{r, eval = FALSE}
+ClusteringCoefficient <- mean(cos(TurningAngles))
+MeanFixRate <- mean(TimeIntervals)
+```
+
+
 ---
 
 ## Complex manipulations (are easy)

@@ -296,6 +296,35 @@ rose.diag(Phi, bins=24); rose.diag(Theta, bins=24)
 &gt; -  the turning angles
 ]
 
+
+---
+
+## Relevent code snippets
+
+
+If `X` and `Y` are coordinates is a track in complex coordinates and `Time` is a POSIX time object:
+
+
+```r
+Z &lt;- X + 1i*Y
+Steps &lt;- diff(Z)
+StepLengths &lt;- Mod(Steps)
+Orientation &lt;- Arg(Steps)
+TurningAngles &lt;- diff(Orientation)
+TotalDistance &lt;- sum(StepLengths)
+TimeIntervals &lt;- diff(Time, units = "hours")
+```
+
+
+And some summary statistics
+
+
+```r
+ClusteringCoefficient &lt;- mean(cos(TurningAngles))
+MeanFixRate &lt;- mean(TimeIntervals)
+```
+
+
 ---
 
 ## Complex manipulations (are easy)
@@ -321,7 +350,7 @@ lines(Z + 40, col="blue", lwd=2) # right by 50
 lines(Z + 20i, col="orange", lwd=2) # up by 100
 ```
 
-![](ComplexNumbers_files/figure-html/unnamed-chunk-16-1.png)&lt;!-- --&gt;
+![](ComplexNumbers_files/figure-html/unnamed-chunk-18-1.png)&lt;!-- --&gt;
 ]
 
 ---
@@ -353,7 +382,7 @@ lines(c(0,Z*Rot2), col="blue", lwd=2)
 lines(c(0,Z*Rot2*Rot2), col="darkblue", lwd=2)
 ```
 
-![](ComplexNumbers_files/figure-html/unnamed-chunk-17-1.png)&lt;!-- --&gt;
+![](ComplexNumbers_files/figure-html/unnamed-chunk-19-1.png)&lt;!-- --&gt;
 ]
 
 ---
@@ -433,7 +462,9 @@ In-depth summer predation study, questions related to habitat use
 
 
 .pull-left[
+
 ## Calculating Null Sets in .blue[**R**]
+
 .red[`1.` Obtain all the steps and turning angles]
 
 
@@ -466,7 +497,7 @@ plot(c(0,RelSteps), asp=1, xlab="x", ylab="y", pch=19)
 arrows(rep(0,n-2), rep(0, n-2), Re(RelSteps), Im(RelSteps), col="darkgrey")
 ```
 
-![](ComplexNumbers_files/figure-html/unnamed-chunk-21-1.png)&lt;!-- --&gt;
+![](ComplexNumbers_files/figure-html/unnamed-chunk-23-1.png)&lt;!-- --&gt;
 
 &gt; Note: in practice (i.e. with tons of data), it is enough to randomly sample some smaller number (e.g. **30**) null steps at each location.
 ]
@@ -503,7 +534,7 @@ for(i in 1:nrow(Z.null))
 
 .pull-right[
 
-![](ComplexNumbers_files/figure-html/unnamed-chunk-24-1.png)&lt;!-- --&gt;
+![](ComplexNumbers_files/figure-html/unnamed-chunk-26-1.png)&lt;!-- --&gt;
 ]
 
 ---
