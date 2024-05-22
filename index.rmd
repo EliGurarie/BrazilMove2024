@@ -109,6 +109,8 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 
 ### Topic: **Segmentation**
 
+- [Lecture](Day3/Segmentation/Segmentation.html)
+
 - First Passage Time
 - Lavielle segmentation
 - Behavioral change point analysis

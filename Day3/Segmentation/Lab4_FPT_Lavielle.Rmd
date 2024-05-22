@@ -98,26 +98,33 @@ elk_lavielle_example_path <- findpath(elk_lavielle_example, 7)
 If we wanted to bind these predictions back to our data, we can do so in a series of steps, first extracting the breakpoints as a vector from our previous object, then adding them to the original data using the `merge` function and the "tidyr" package's, `fill` function to fill in values with their corresponding segment.
 
 ```{r}
-breakpoints <- unlist(elk_lavielle_example_path)
+require(plyr)
+breakpoints <- do.call(rbind, elk_lavielle_example_path)
+
 breakpoints
 ```
 
-```{r}
-breakpoints_df <- data.frame(Row_ID = breakpoints, segment= 1:length(breakpoints))
-elk_example_data$Row_ID <- cumsum(rep(1, nrow(elk_example_data)))
-elk_example_data_lav <- merge(elk_example_data, 
-                              breakpoints_df, by="Row_ID", 
-                              all.x=TRUE)
-elk_example_data_lav <- tidyr::fill(elk_example_data_lav, segment, .direction = 'down')
-head(elk_example_data_lav)
+```{r AugmentDataWithBreakpoints}
+require(plyr)
+
+cuts <- c(breakpoints[,1]-.5, nrow(elk_example_data))
+
+elk_example_data <- elk_example_data |> 
+  mutate(Row_ID = 1:nrow(elk_example_data),
+         Phase = cut(Row_ID, 
+                     breaks = cuts, 
+                     labels = 1:nrow(breakpoints)))
+
+head(elk_example_data)
 ```
 
 We can visualize the final results using ggplot: 
 
 ```{r}
-ggplot(data=elk_example_data_lav, aes(x=datetime, y=lat)) +
-  geom_path(col = "grey")+
-  geom_path(aes(color = factor(segment))) + 
+require(ggplot2)
+ggplot(data=elk_example_data, aes(x=datetime, y=lat)) +
+  geom_path(col = "grey") + 
+  geom_point(aes(color = phase)) + 
   theme_classic()
 ```
 

@@ -1,0 +1,251 @@
+---
+title: "Segmentation Methods 1: Lavielle"
+author: "Nicki Barbour and Elie Gurarie"
+subtitle: "[Brazil Move 2024 - UFMS - Campo Grande](https://eligurarie.github.io/BrazilMove2024)"
+date: "May 22, 2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Pick an elk
+
+First, let's load in our processed data from lab 1.
+
+```{r, echo = -1}
+setwd("../../")
+load("./data/elk_processed.rda")
+```
+We will use one individual from our data as an example, "YL96". This individual has some "patches" of residency-like behavior along its track.
+
+```{r}
+myelk <- subset(elk_gps, id == "YL96") |>
+  dplyr::mutate(id = as.character(id))
+
+str(myelk)
+```
+
+
+We can use Base R to visualize the track of this individual in space and time, using the methods we learned in lab 1:
+
+
+```{r}
+par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+layout(rbind(c(1,2), c(1,3)))
+plot(myelk$lon, myelk$lat, asp = 1, type="o", ylab="Latitude", xlab="Longitude")
+plot(myelk$datetime, myelk$lon, type="o", xaxt="n", ylab="Longitude", xlab="")
+plot(myelk$datetime, myelk$lat, type="o", ylab="Latitude", xlab="Datetime")
+title(paste("ID", myelk$id[1]), outer = TRUE)
+```
+
+# Lavielle Method
+
+Lavielle’s method identifies behavioral break points by applying a moving window over the timeseries. The optimal number of segments, *k*, in the timeseries is then determined by minimizing the "penalized contrast function" (Lavielle 2005). Break points are determined using the mean, variance, or mean AND variance along the timeseries of the variable of interest (e.g., speed).  The assumption is that in each phase, the model for the data is:
+
+$$X = {\cal N}(\mu_i, \sigma_i)$$
+
+You can perform this analysis on **absolute positions** or on **speeds**. 
+
+
+## Segmenting on positions
+
+Load the `adehabitatLT` package: 
+
+```{r}
+require(adehabitatLT)
+```
+
+
+The Lavielle Method is fit using the `laveielle` function, where the user can specify the:
+
+1 - variable from the dataset to distinguish the segments by (here, we will use latitude)
+2 - `Lmin` - the minimum number of relocations within a segment
+3 - `Kmax` - the maximum number of segments to "try out"
+4 - `type` - how to distinguish the segments (mean, variance, or both, "meanvar")
+  
+We can use the visualizations of our track to inform our decisions on these parameters. 
+
+Here, we will use a minimum of 20 locations, max of 5 segments, and the mean to determine segments by **latitude**.
+
+```{r}
+elk_lavielle_example <- lavielle(myelk$lat, Lmin = 20, Kmax = 10, type = "mean")
+```
+
+After fitting, we can use the `chooseseg` function to identify the number of segments.
+Here it looks the the optimal number, k, is 3.
+
+```{r}
+chooseseg(elk_lavielle_example)
+```
+
+We can now create a nice plot of these segments, with the change in latitude over time and the red lines dilineating the break points for each segment.
+
+```{r}
+elk_lavielle_example_path <- findpath(elk_lavielle_example, 7)
+```
+
+If we wanted to bind these predictions back to our data, we can do so in a series of steps, first extracting the breakpoints as a vector from our previous object, then adding them to the original data using the `merge` function and the "tidyr" package's, `fill` function to fill in values with their corresponding segment.
+
+```{r}
+breakpoints <- do.call(rbind, elk_lavielle_example_path)
+breakpoints
+```
+
+```{r AugmentDataWithPhase}
+require(plyr)
+cuts <- c(breakpoints[,1]-.5, nrow(myelk))
+myelk <- myelk |> 
+  mutate(Row_ID = 1:nrow(myelk),
+         phase = cut(Row_ID, 
+                     breaks = cuts, 
+                     labels = 1:nrow(breakpoints)))
+```
+
+We can visualize the final results using ggplot: 
+
+```{r PhaseWithLatitude}
+require(ggplot2)
+ggplot(data=myelk, aes(x=datetime, y=lat)) +
+  geom_path(col = "grey") + 
+  geom_point(aes(color = phase)) + 
+  theme_classic()
+```
+
+```{r mapWithPhase}
+require(ggplot2)
+ggplot(data=myelk, aes(x=lon, y=lat)) +
+  geom_path(col = "grey") + 
+  geom_point(aes(color = phase)) + 
+  theme_classic()
+```
+
+
+## Segmenting on speeds
+
+A problem with this segmentation is that it does not separate transitional movements from the resident movements.   It therefore might make more sense to do this on the *velocities* or *speeds*. 
+
+First, obtain those velocities, using some of the augmentation code from before:
+
+```{r}
+require(sf)
+require(dplyr)
+
+elk_df <- elk_gps |> 
+  data.frame(elk_sf |> st_transform(32611) |> st_coordinates()) |> 
+  group_by(id) |> 
+  mutate(
+      Z = X + 1i*Y,
+    	Step = c(NA, diff(Z)),
+    	StepLength = Mod(Step),
+    	dTime = c(NA, difftime(datetime[-1],
+                           	datetime[-length(datetime)],
+                           	units = "hours")),
+    	Speed = StepLength/dTime)
+
+myelk <- subset(elk_df, id == "YL96")
+```
+
+
+Let's look at the time series of the speed:
+
+```{r}
+with(myelk,
+  plot(datetime, Speed, type = "l"))
+```
+
+There is a lot of data here!  Also - it is not normal. 
+
+```{r}
+qqnorm(myelk$Speed)
+```
+
+The log trandform, on the other hand:
+
+```{r}
+hist(log(myelk$Speed))
+```
+
+```{r}
+with(myelk, plot(datetime, log(Speed), type = "l"))
+```
+
+Ok - are there some significant changes in here?  
+
+
+> NOTE:  For reasons that are unclear to me, the segmentation has a hard time
+with the complete dataset ... so I subset an (interesting) portion of the data. 
+
+```{r}
+myelk_subset <- myelk[1000:1600,]
+ggplot(myelk_subset, aes(X,Y)) + geom_path()
+
+LogSpeed <- log(myelk_subset$Speed)[-1]
+myelk_speed_lv <-  lavielle(LogSpeed, Lmin = 24, Kmax = 20, type = "mean")
+```
+
+Choose the segments: 
+
+```{r}
+chooseseg(myelk_speed_lv)
+```
+
+Find the breaks:
+
+```{r}
+elk_segments <- findpath(myelk_speed_lv, 10)
+```
+
+```{r}
+breakpoints <- do.call(rbind, elk_segments)
+breakpoints
+```
+
+Add the breaks
+
+```{r AugmentDataWithBreakpoints}
+require(plyr)
+cuts <- c(breakpoints[,1]-.5, nrow(myelk))
+myelk_subset <- myelk_subset |> 
+  mutate(Row_ID = 1:nrow(myelk_subset),
+         speedphase = cut(Row_ID, 
+                     breaks = cuts, 
+                     labels = 1:nrow(breakpoints)))
+```
+
+Visualize the time series
+
+```{r plotSpeedPhase}
+require(ggplot2)
+ggplot(data=myelk_subset, aes(x=datetime, y=Speed)) +
+  geom_path(col = "grey") + 
+  geom_point(aes(color = speedphase)) + 
+  theme_classic()
+```
+
+Map with the phases:
+
+```{r mapWithSpeedPhase}
+require(ggplot2)
+ggplot(data=myelk_subset, aes(x=lon, y=lat)) +
+  geom_path(col = "grey") + 
+  geom_point(aes(color = speedphase)) + 
+  theme_classic()
+```
+
+How do the speeds compare across htese phases? 
+
+```{r}
+myelk_subset |> group_by(speedphase) |> 
+  dplyr::summarize(start = min(datetime),
+            end = max(datetime),
+            Speed.mean = mean(Speed),
+            Speed.sd = sd(Speed))
+```
+
