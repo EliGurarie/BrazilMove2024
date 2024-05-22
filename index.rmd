@@ -99,6 +99,8 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 
 - [Lecture/Lab](Day2/05_StatisticalSummaries/Lab_StatisticalSummaries.html)
 
+## Day 3: Wednesday, May 22
+
 
 ### Topic: Movement Models
 
@@ -116,26 +118,11 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 **Exercise:** *Apply a movement model or segmentation method to your data.*
 </font>
 
-## Day 3: Wednesday, May 22
-
-### Morning:  **Home Range Analyses**
-
-<font color = "darkred"> 
-**Present:** *results from the previous day*
-</font>
+### Afternoon:  **Home Range Analyses**
 
 - Mininum convex polygon
 - Kernel density estimates
 - Auto-correlated kernel density estimates
-
-### Afternoon:  **Environmental Data**
-
-- Spatial data and annotations
-- Summaries of Use and Availability
-
-<font color = "darkred"> 
-**Exercise:** *Estimate a home range and/or characterize environmental space use of your organism,*
-</font>
 
 ## Day 4: Thursday, May 23
 
