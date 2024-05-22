@@ -92,7 +92,7 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 
 ### Topic: Complex Numbers are Simple
 
-- [Lecture/Lab](Day1/03_SummariesVisualization/ComplexNumbers.html)
+- [Lecture/Lab](Day2/04_ComplexNumbers/ComplexNumbers.html)
 - See also book chapter [here](https://eligurarie.github.io/MovementEcologyBook/part2_data_and_manipulations/complex_numbers.html).  
 
 ### Topic: Summary Statistics
