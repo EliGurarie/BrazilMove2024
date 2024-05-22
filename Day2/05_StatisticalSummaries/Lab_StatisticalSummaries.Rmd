@@ -60,7 +60,8 @@ Our time variable (`datetime`) is a `POSIXct` object - which is good.  The `lubr
 ```{r AddYday, eval = FALSE}
 elk_gps <- elk_gps |> mutate(doy = yday(datetime),
                             Month = month(datetime),
-                            Year = year(datetime))
+                            Year = year(datetime),
+                            Hour = hour(datetime))
 head(elk_gps)
 ```
 
@@ -122,13 +123,13 @@ And some summary statistics:
 
 mean
 
-```{r stats}
+```{r mean}
 mean(table(elk_df$id))
 ```
 
 standard deviation
 
-```{r stats}
+```{r sd}
 sd(table(elk_df$id))
 ```
 
@@ -337,7 +338,7 @@ getMoveStats <- function(df){
 We took care to pick this function apart into individual pieces. And understand that it returns a new data frame with the additional columns appended to the original data frame. The `ddply` command will apply this function to every individual in every season in every year. This is now very quick:
 
 ```{r SL}
-elk_movestats <- elk_df |> plyr::ddply("id", getMoveStats)
+elk_movestats <- elk_df |> ddply("id", getMoveStats)
 ```
 
 ```{r, echo = FALSE}
@@ -347,103 +348,102 @@ elk_movestats |>  head() |> kable()
 
 ```{r}
 ggplot(elk_movestats, aes(doy, MR)) +
-    geom_point(alpha = 0.1) + geom_smooth() + 
-  ylab("Movement Rate (km/h")  + scale_y_sqrt()
-```
-
-
-### Subsetting by Season
-
-To answer this question, we need to focus on movement data of elk during winter and summer only. Let's say (arbitrarily) that winter is only January and February, and summer is just July and August. We can use `month()` to subset the data accordingly.
-
-```{r filterseasons}
-elk_winter_summer <- elk_df |> mutate(Month = month(datetime)) |>
-  subset(Month %in% c(1,2,6,7))
-
-str(elk_winter_summer)
-```
-
-```{r ggplotMovementRates, fig.width= 8}
-ggplot(elk_winter_summer, aes(doy, MR, col = id)) + 
-  geom_point() + geom_smooth() + 
-  ylab("Movement Rate (km/h)") + 
-  coor
-```
-
-To add a column "season", we can use the `ifelse()`, function which returns different values depending on whether a given element in a vector satisfies a condition.
-
-```{r addSeason}
-elk_winter_summer <- elk_winter_summer |> 
-  mutate(season = ifelse(Month < 3, "Winter", "Summer"))
-
-table(elk_winter_summer$season)
-```
-
-You could also perform this operation with a vector of days of year and the useful `cut()` function, which transforms numeric data to ordered factors. Thus, to obtain breaks:
-
-```{r subsetSeasons}
-season.dates <- c(winter.start = yday("2023-01-01"), 
-                  winter.end = yday("2023-02-28"),
-                  summer.start = yday("2023-07-01"),
-                  summer.end = yday("2023-08-31"))
-season.dates
+    geom_smooth() + 
+  ylab("Movement Rate (km/h")  + scale_y_sqrt() + 
+  ggtitle("Overall movement rates by day of year")
 ```
 
 ```{r}
-cut.dates <- c(season.dates, 367)
+n.ids <-  elk_movestats$id |> table()
+ids <- names(n.ids)[n.ids > 1000]
 
-elk_winter_summer <- elk_df |>
-  mutate(season = cut(yday(datetime), cut.dates, labels = c("winter","other","summer","other"))) |> 
-  subset(season != "other") |> droplevels()
-
-table(elk_winter_summer$season)
+ggplot(elk_movestats  |> subset(id %in% ids), aes(doy, MR, col = id)) +
+    geom_smooth() + 
+  ylab("Movement Rate (km/h")  + scale_y_sqrt() + 
+  ggtitle("Individual movement rates by day of year") + 
+  theme_classic()
 ```
-
-
-
-### Quick analysis of Movement Rates
-
-We are ready now (finally) to answer the question: **Is there a difference in movement rate between winter and summer?** We can start with a quick boxplot of the movement rates against individual ID's and season. The distributions are highly skewed and quite variable, with some animals really on the move, and some spending a lot of time not moving at all.
-
-```{r ggplotMovementRates, fig.width= 8}
-ggplot(elk_winter_summer, aes(id, MR)) + 
-  geom_boxplot() + 
-  facet_wrap(.~season) + ylab("Movement Rate (km/h)")
-```
-
-Immediately, we see that there is a dramatic outlier!  Let's explore this a bit:
 
 ```{r}
-elk_winter_summer[,c("id","datetime","Month","doy","MR")] |> subset(MR == max(MR, na.rm=TRUE))
+ggplot(elk_movestats, aes(Hour, MR)) +
+    geom_smooth() + 
+  ylab("Movement Rate (km/h")  + scale_y_sqrt() + 
+  ggtitle("Overall movement rates by time of day")
 ```
+
+
+# Final version
+
+The code we developed in class is below, and works very similarly to the code above
+
+
 ```{r}
-myelk <- elk_winter_summer |> subset(doy == 195 & id == "YL56")
-plot(myelk$Z, type = "o", asp = 1)
-plot(myelk$SL, type = "o")
+load(file = "data/elk_processed.rda")
+head(elk_df)
+
+require(plyr)
+require(lubridate)
+
+#  mutate - adds columns
+
+myelk <- elk_df |> subset(id == 4049)
+
+augmentDF <- function(df){
+  df |> mutate(Month = month(datetime),
+   	doy = yday(datetime),
+    	hour = hour(datetime),
+    	Z = X + 1i*Y,
+    	Step = c(NA, diff(Z)),
+    	StepLength = Mod(Step),
+    	dTime = c(NA, difftime(datetime[-1],
+                           	datetime[-length(datetime)],
+                           	units = "hours")),
+    	Speed = StepLength/dTime,
+    	Orientation = Arg(Step),
+    	TurningAngle = c(NA, diff(Orientation))
+   	)
+}
+
+require(dplyr)
+
+elk_df2 <- elk_df |> group_by(id) |> augmentDF()
+
+# seasonal patterns
+
+myelk <- elk_df2 |> subset(id == 4049)
+
+  ggplot(myelk, aes(x = factor(hour), y = Speed)) +
+	geom_boxplot()
+  ggplot(myelk |> na.omit(),
+     	aes(x = doy, y = Speed)) +
+	geom_smooth
+ 
+
+##  summarize
+
+myelk <- elk_df2 |> subset(id == 4049)  
+
+elk_summary<-elk_df2 |> group_by(id) |> dplyr::summarize(
+  n.obs = length(id),
+  start = min(datetime),
+  end = max(datetime),
+  duration = difftime(end, start, units = "days"),
+  total.distance = sum(StepLength, na.rm=TRUE),
+  speed.median = median(Speed, na.rm = TRUE),
+  speed.q25 = quantile(Speed, .25, na.rm = TRUE),
+  speed.q75 = quantile(Speed, .75, na.rm = TRUE),
+  fix.rate.median = median(dTime, na.rm  = TRUE),
+  fix.rate.min = min(dTime, na.rm  = TRUE),
+  fix.rate.max = max(dTime, na.rm  = TRUE)
+) |> data.frame()
+ 
+
+
+ggplot(elk_summary, aes(y = id, xmin = start, xmax = end)) +
+     	geom_linerange(size = 2) +
+  ggtitle("Elk monitoring times")
+
 ```
 
-Probably in the space of 2 hours the elk did not move 30 km!  This location is an error and should be eliminated.  The summary stats help us find errors like that. For now, we'll just remove that row from the data: 
-
-```{r}
-elk_winter_summer <- elk_winter_summer |> subset(SL < 30)
-```
 
 
-Some season & individual summary stats:
-
-```{r mr_summarystats}
-mr_summarystats <- elk_winter_summer |>
-  ddply(c("id","season"), summarize,
-    min = min(MR, na.rm = TRUE), 
-    max = max(MR, na.rm = TRUE),
-    n = length(MR), 
-    NA.count = sum(is.na(MR)),
-    Zero.count = sum(MR == 0, na.rm = TRUE)
-    )
-```
-
-```{r, echo = FALSE}
-mr_summarystats |> kable()
-```
-
-Our output helpfully shows the number of NA's and zeros for each individual and by the season. Individuals with many 0's or NA's may warrant further investigation or even dropping from your dataset. 

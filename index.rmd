@@ -95,9 +95,15 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 - [Lecture/Lab](Day2/04_ComplexNumbers/ComplexNumbers.html)
 - See also book chapter [here](https://eligurarie.github.io/MovementEcologyBook/part2_data_and_manipulations/complex_numbers.html).  
 
-### Topic: Summary Statistics
+### Topic: Statistical Summaries
+
+- [Lecture/Lab](Day2/05_StatisticalSummaries/Lab_StatisticalSummaries.html)
+
 
 ### Topic: Movement Models
+
+- [Lecture](Day3/06_MovementModels/DiscreteMovementModels.html)
+
 
 ### Topic: **Segmentation**
 

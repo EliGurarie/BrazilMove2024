@@ -1,0 +1,123 @@
+---
+title: "Segmentation Methods 1: Lavielle"
+author: "Nicole Barboure and Elie Gurarie"
+date: "2024-05-17"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
+```
+
+# Load Data In
+
+First, let's load in our processed data from lab 1.
+
+```{r}
+setwd("../..")
+load("./data/elk_processed.rda")
+head(elk_gps)
+```
+
+# Select Example Individual and Visualize
+
+We will use one individual from our data as an example, "YL96". This individual has some "patches" of residency-like behavior along its track.
+
+```{r}
+elk_example_data <- subset(elk_gps, id == "YL96") |>
+  dplyr::mutate(id = as.character(id))
+
+str(elk_example_data)
+```
+
+
+We can use Base R to visualize the track of this individual in space and time, using the methods we learned in lab 1:
+
+
+```{r}
+par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+layout(rbind(c(1,2), c(1,3)))
+plot(elk_example_data$lon, elk_example_data$lat, asp = 1, type="o", ylab="Latitude", xlab="Longitude")
+plot(elk_example_data$datetime, elk_example_data$lon, type="o", xaxt="n", ylab="Longitude", xlab="")
+plot(elk_example_data$datetime, elk_example_data$lat, type="o", ylab="Latitude", xlab="Datetime")
+title(paste("ID", elk_example_data$id[1]), outer = TRUE)
+```
+
+# Lavielle Method
+
+Lavielle’s method identifies behavioral break points by applying a moving window over the timeseries. The optimal number of segments, k, in the timeseries is then determined by minimizing the "penalized contrast function" (Lavielle 2005). Break points are determined using the mean, variance, or mean AND variance along the timeseries of the variable of interest (e.g., speed).
+
+To perform this segmentation, we need to load the `adehabitatLT` package: 
+
+```{r}
+require(adehabitatLT)
+```
+
+```{r}
+str(elk_example_data)
+```
+
+This method also uses the "adehabitatLT" package. 
+
+The Lavielle Method is fit using the `laveielle` function, where the user can specify the:
+
+1 - variable from the dataset to distinguish the segments by (here, we will use latitude)
+  
+2 - `Lmin` - the minimum number of relocations within a segment
+  
+3 - `Kmax` - the maximum number of segments to "try out"
+  
+4 - `type` - how to distinguish the segments (mean, variance, or both, "meanvar")
+  
+We can use the visualizations of our track to inform our decisions on these parameters. 
+
+Here, we will use a minimum of 20 locations, max of 5 segments, and the mean to determine segments by latitude.
+
+```{r}
+elk_lavielle_example <- lavielle(elk_example_data$lat, Lmin = 20, Kmax = 10, type = "mean")
+```
+
+After fitting, we can use the `chooseseg` function to identify the number of segments.
+Here it looks the the optimal number, k, is 3.
+
+```{r}
+chooseseg(elk_lavielle_example)
+```
+
+We can now create a nice plot of these segments, with the change in latitude over time and the red lines dilineating the break points for each segment.
+
+```{r}
+elk_lavielle_example_path <- findpath(elk_lavielle_example, 7)
+```
+
+If we wanted to bind these predictions back to our data, we can do so in a series of steps, first extracting the breakpoints as a vector from our previous object, then adding them to the original data using the `merge` function and the "tidyr" package's, `fill` function to fill in values with their corresponding segment.
+
+```{r}
+breakpoints <- unlist(elk_lavielle_example_path)
+breakpoints
+```
+
+```{r}
+breakpoints_df <- data.frame(Row_ID = breakpoints, segment= 1:length(breakpoints))
+elk_example_data$Row_ID <- cumsum(rep(1, nrow(elk_example_data)))
+elk_example_data_lav <- merge(elk_example_data, 
+                              breakpoints_df, by="Row_ID", 
+                              all.x=TRUE)
+elk_example_data_lav <- tidyr::fill(elk_example_data_lav, segment, .direction = 'down')
+head(elk_example_data_lav)
+```
+
+We can visualize the final results using ggplot: 
+
+```{r}
+ggplot(data=elk_example_data_lav, aes(x=datetime, y=lat)) +
+  geom_path(col = "grey")+
+  geom_path(aes(color = factor(segment))) + 
+  theme_classic()
+```
+
