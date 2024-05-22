@@ -79,19 +79,24 @@ scan_track <- function(dataframe, x = "lon", y = "lat",
 
 
 ## ----------------------------------------------------------------------------------------------------------
-scan_track(elk_gps |> subset(id == id[1]))
-
+scan_track(elk_gps |> subset(id == "GR182"))
+elk_gps$id |> unique()
 
 ## ----------------------------------------------------------------------------------------------------------
-myelk <- elk_gps |> subset(id == id[1])
+myelk <- elk_gps |> subset(id == "GR182")
 scan_track(myelk, x = "X", y = "Y",
-                 col = topo.colors(nrow(myelk)))
+           col = topo.colors(nrow(myelk)))
+
+
+
+
 
 
 ## ----------------------------------------------------------------------------------------------------------
 require(plyr)
-elk_gps |> subset(id %in% levels(id)[1:5]) |> d_ply("id", scan_track)
-
+pdf("elk_scantracks.pdf", width = 8, height = 4)
+elk_gps |> d_ply("id", scan_track)
+dev.off()
 
 ## ----------------------------------------------------------------------------------------------------------
 library(ggplot2)

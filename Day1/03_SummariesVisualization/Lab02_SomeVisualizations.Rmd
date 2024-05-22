@@ -18,8 +18,6 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE,
 knitr::opts_knit$set(root.dir = '../../')
 ```
 
-# Visualizations
-
 Visualizing data is an important step in the data processing and analysis stages.
 
 Learning how to visualize your data correctly can help you catch errors in your code, outliers in your data, and interesting patterns that will inform your analysis choices.
@@ -165,7 +163,7 @@ We can use the `plyr` package with the `d_ply` function to apply our new functio
 
 The following code generates the figure above for the first 5 elk, for example:
 
-```{r}
+```{r ScanTrack5Elk, fig.height = 3}
 require(plyr)
 elk_gps |> subset(id %in% levels(id)[1:5]) |> d_ply("id", scan_track)
 ```
@@ -236,9 +234,9 @@ plot(elk_sf[,"id"], pch = 19)
 
 Without a background map, this plot is not very informative!
 
-### ggplot and ggmap
+### `ggmap` and Stadia maps
 
-The "ggmap" package works helpfully with ggplot functions and sf data to add open-source basemaps. More info on the package can be found on the [ggmap Github Repo Page](https://github.com/dkahle/ggmap).
+The `ggmap` package works helpfully with ggplot functions and sf data to add open-source basemaps. More info on the package can be found on the [ggmap Github Repo Page](https://github.com/dkahle/ggmap).
 
 ```{r}
 library(ggmap)
@@ -285,7 +283,7 @@ ggmap(basemap, extent = "normal") +
 Not bad - but it is hard to get good colors on top of this map!
 
 
-### ggplot and ggspatial
+###  `ggspatial` and Open Street Map
 
 We can use the `ggspatial` package to add open map tiles to the background of our map.
 
@@ -297,74 +295,83 @@ library(ggspatial)
 
 The `ggspatial` R package is great for maps using Open Street Map (OSM) base map tiles (open source).
 
-The `annotation_map_tile` function allows you to specify a background map type (“type=”) and zoom level (`zoom=`, where a higher zoom is a higher resolution but may take longer to render). You can run the code `rosm::osm.types` to see all the different map tile types available (we will use the “osm” one).
+The `annotation_map_tile` function allows you to specify a background map type (“type=”) and zoom level (`zoom=`, where a higher zoom is a higher resolution but may take longer to render). You can run the code `rosm::osm.types` to see all the different map tile types available.  We will use the "Open Street Map" (osm) one.  You can then add on your other, regular ggplot functions, such as `geom_sf` and theme options.
 
-You can also add some nice map features, such as a scale bar (function `annotation_scale()`) and a north arrow (function `annotation_north_arrow()`, with arguments for specifying height, width, padding dimensions). You can also specify nicer axis labels and breaks using the `scale_y_continuous` and `scale_x_continuous` functions, specifying the
-
-You can then add on your other, regular ggplot functions, such as `geom_sf` and theme options.
+First specify the bounding box of the map:
 
 ```{r GGspatial}
-box <- st_bbox(c(xmin = -116.4, xmax = -115.4, ymin = 51.5, ymax = 52.2), crs = st_crs(4326))
-
-E4049.sf <- subset(elk_sf, id == "4049")
-
-ggplot() +
-  annotation_map_tile(type = 'osm', zoom = 11) +
-  annotation_scale() +
-  annotation_north_arrow(height=unit(0.5,"cm"), width=unit(0.5,"cm"), pad_y = unit(1,"cm"))+
-  shadow_spatial(box )+
-  ylab("Latitude") + xlab("Longitude")+
-  scale_x_continuous(breaks= seq(-116, -115.2, .4))+
-  geom_sf(data=E4049.sf, aes(), color="orange", size=2)+
-  theme_classic()
+elk_box <- st_bbox(c(xmin = -115.6, xmax = -115.4, 
+                     ymax = 51.5, ymin = 51.75), crs = st_crs(4326))
 ```
 
+Next - create a fully-featured map pulling the data from Open Street Maps.  
+You can add some nice map features, such as a scale bar (function `annotation_scale()`) and a north arrow (function `annotation_north_arrow()`, with arguments for specifying height, width, padding dimensions). You can also specify nicer axis labels and breaks using the `scale_y_continuous` and `scale_x_continuous` functions.  
 
-
-#### Export Static Map
-
-If you wanted to export your map, you could do so by sandwhiching your map code between the file type function you want the image to be saved as (e.g., `jpeg` or `png`) and the function `dev.off()`.
-
-```{r eval = FALSE}
-jpeg(file="./E4049_Map.jpg", units="in", width=4, height=7,res=300)
-E4049.sf <- subset(elk_sf, id == "4049")
-ggplot() +
-  annotation_map_tile(type = 'osm', zoom = 12) +
-  annotation_scale() +
+```{r elk basemap, fig.width = 4, fig.height = 6}
+elk_basemap <- ggplot() +
+  annotation_map_tile(type = 'osm', zoom = 10) +
+  annotation_scale()+
   annotation_north_arrow(height=unit(0.5,"cm"), width=unit(0.5,"cm"), pad_y = unit(1,"cm"))+
-  shadow_spatial(box )+
+  shadow_spatial(elk_box)+
   ylab("Latitude") + xlab("Longitude")+
-  scale_x_continuous(breaks= seq(-116, -115.2, .4))+
-  geom_sf(data=E4049.sf, aes(), color="orange", size=2)+
-  theme_classic()
-dev.off()
+  scale_y_continuous(breaks= c(51.5, 51.6, 51.7, 51.75))+
+  scale_x_continuous(breaks= c(-115.6, -115.5, -115.4))
+  
+plot(elk_basemap)
 ```
 
+Finally, we add the elk data, coloring by `id`.  That that `geom_sf` is meant to map spatial data - so you don't need the x and y in the aesthetic. 
 
-### mapview
+```{r addElk, fig.width = 8, fig.height = 6}
+elk_basemap +  
+  geom_sf(data=elk_sf, aes(col = id)) 
+```
 
-Interactive mapping in R with the "mapview" R package is a useful way to visualize and engage with spatial data.
+Note - that is faster and sometime more attractive to plot not points but lines.  To do that with a simple feature, you have to (a) group the points, (b) combine them `summarize`, and then (c) "cast" them into `LINESTRINGS` with `st_cast`.
 
 ```{r}
-library(mapview)
-```
-
-Let's create spatial tracks of all of our elk data, using our "elk_sf" object. 
-
-We use the `summarize` function and the `st_cast` function with the `group_by` function from the dplyr package to first create individual elk tracks, as LINESTRINGS.
-
-
-```{r}
+require(dplyr)
 elk_tracks <- elk_sf |> 
   group_by(id) |> 
   summarize(do_union=FALSE) |> 
   st_cast("LINESTRING")
 ```
 
-Now we can use the `mapview` function to plot our tracks, specifying to color the tracks by different ids with the "zcol" argument. Note that the `mapview` function can plot any spatial data and has a variety of additional controls/arguments available (see [Advanced Mapview Controls](https://r-spatial.github.io/mapview/articles/mapview_02-advanced.html) for more options and examples).
+Note that `elk_tracks` is a simple feature with one row per animal, and each row contains a complete geometry of lines: 
 
-```{r finalmapview, cache = FALSE}
-require(mapview)
-mapview(elk_tracks, zcol="id")
+```{r}
+elk_tracks
 ```
 
+
+The map above with lines looks like this: 
+
+```{r addElkLines, fig.width = 5, fig.height = 6}
+elk_basemap +  
+  geom_sf(data=elk_tracks, aes(col = id)) 
+```
+
+### Exporting Static Map
+
+To export your map, you could do so by sandwhiching your map code between the file type function you want the image to be saved as (e.g., `jpeg` or `png`) and the function `dev.off()`.
+
+```{r eval = FALSE}
+jpeg(file="./GP1_Map.jpg", units="in", width=4, height=7,res=300)
+  elk_basemap +  
+    geom_sf(data=elk_sf, aes(col = id))
+dev.off()
+```
+
+
+## mapview
+
+Interactive mapping in R with the `mapview` R package is a useful way to visualize and engage with spatial data. You've seen this with individual animals, but it is even faster once they are turned into "tracks", specifying to color the tracks by different ids with the `zcol` argument.
+
+```{r mapview_tracks}
+library(mapview)
+mapview(elk_tracks, zcol="id")
+
+```
+
+
+Note that the `mapview` function can plot any spatial data and has a variety of additional controls/arguments available (see [Advanced Mapview Controls](https://r-spatial.github.io/mapview/articles/mapview_02-advanced.html) for more options and examples).
