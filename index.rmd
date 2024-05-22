@@ -110,11 +110,7 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 ### Topic: **Segmentation**
 
 - [Lecture](Day3/Segmentation/Segmentation.html)
-
-- First Passage Time
-- Lavielle segmentation
-- Behavioral change point analysis
-- Hidden Markov models
+- [Lab - Lavielle Segmentation](Day3/Segmentation/Lab4_LavielleSegmentation.html)
 
 <font color = "darkred"> 
 **Exercise:** *Apply a movement model or segmentation method to your data.*
