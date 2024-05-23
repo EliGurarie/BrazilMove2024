@@ -1,0 +1,159 @@
+
+# Behavioral Change Point Analysis
+
+The "smoove" package allows for multiple continuous-time movement models (correlated velocity models or CVMs) to be fit to irregular tracking data to identify "modes" of behavior. 
+
+Each model comes with it's own set of parameters and "best" fitting models are determined using AIC/BIC and maximum likelihood. 
+
+CVM model options include: Uncorrelated CVM (UCVM), Advective CVM (AVCM), Rotational CVM (RCVM), and Rotational-Advective CVM (RACVM). 
+
+A single-change point can also be identified assuming just a UCVM process and sudden changes in the UCVM parameters, time scale, and root mean square speeds.
+
+Check out the "smooth" package [vignette](https://htmlpreview.github.io/?https://github.com/EliGurarie/smoove/blob/master/doc/smoove.html) for more examples and details.
+
+```{r eval=FALSE}
+library(devtools)
+
+install_github("EliGurarie/smoove")
+```
+
+```{r}
+library(smoove)
+library(sf)
+```
+
+First, we need to use the methods we learned in lab 1 to convert our data to an sf object and then convert the coordinates to a projected coordinate system. We then extract and store the coordinates and save them as X and Y variables in our data.
+
+```{r}
+elk_utm <- elk_mig |>
+  st_as_sf(coords = c("lon","lat"), crs = 4326) |>
+  st_transform(32611)
+
+coords <- st_coordinates(elk_utm)
+
+elk_mig$X <- coords[,1]
+
+elk_mig$Y <- coords[,2]
+
+elk_mig$Z <- elk_mig$X + 1i*elk_mig$Y
+```
+
+We will select one of our "migratory" individuals as an example for the analyses, "YL73".
+
+```{r}
+elk_example <- elk_mig |>
+  dplyr::select(id, datetime, X, Y, Z) |>
+  dplyr::filter(id == "YL73")
+
+```
+
+We can use the `scantrack` function from the "smoove" package to plot this individual's track in multiple dimensions:
+
+```{r}
+
+with(elk_example, scan_track(x = X, y = Y, main = "YL73"))
+```
+
+We can now apply the `sweepRACVM` function to:
+
+1 - set a "window" size to move along the track and detect changes in behavior (size should reflect temporal scale of behavior of interest)
+
+2 - using the set window and the "windowstep" as the step size, "sweep" along the track, and determine the likelihoods of various changepoints.
+
+We will try a window size of ~ 200 days and windowstep of ~ 30 days. 
+
+*Note*: this can take a long time to run. The parallel example may be a better option, especially if your computer has a decent number of cores.
+
+```{r eval = FALSE}
+elk_sweep <- with(elk_example, sweepRACVM(Z = Z, T = datetime, windowsize = 200, time.unit = "days", windowstep = 30, model = "RACVM", progress = TRUE))
+```
+
+To use the parallel example, you first have to install and load the "doParallel" package.
+
+```{r}
+library(doParallel)
+```
+
+You then need to use the `makeCluster` and `detectCores` functions to define the clusters for parallel processing.
+
+```{r eval = FALSE}
+cl <- parallel::makeCluster(parallel::detectCores())
+
+doParallel::registerDoParallel(cl)
+```
+
+The same function can now be run, using the ".parallel = TRUE" argument instead.
+
+```{r eval = FALSE}
+elk_sweep <- with(elk_example, sweepRACVM(Z = Z, T = date, windowsize = 200, time.unit = "days", windowstep = 30, model = "RACVM", progress = TRUE, .parallel = TRUE))
+```
+
+```{r include = FALSE}
+#save(elk_sweep, file="./data/elk_behavioral_changepoint.rda")
+
+load("./data/elk_behavioral_changepoint.rda")
+```
+
+
+The resulting object can be plotted with the `plotWindowSweep` function to visualize the relative log-likelihood profile for a single window. 
+
+Here, you are looking for distinct peaks in the log-likelihood, which indicate significant changepoints.
+
+```{r}
+plotWindowSweep(elk_sweep, main = "YL73")
+```
+
+Now that the likelihood profiles for candidate change points have been determined, the `findCandidateChangePoints` function can be used to identify the distinct changepoints in the data based on these likelihood profiles.
+
+The "clusterwidth" argument can be used to group changepoints together that may be quite similar.
+
+You can also decide which models to use as candidates for each changepoint segment (UCVM, ACVM, RCVM, RACVM) - here, we use "all" and additionally use AIC for model selection, as BIC can be overly conservative.
+
+*Note*: If your clusterwidth is too low, the function will give you a warning that some of the candidate changepoints are too close in time to each other to be considered distinct.
+
+```{r}
+elk_cp <- findCandidateChangePoints(windowsweep = elk_sweep, clusterwidth = 6) |>
+  getCPtable(modelset = "all", criterion="AIC")
+```
+
+Finally the different behavioral phases corresponding the chosen changepoints can be estimated and summarized using the `estimatePhases` and `summarizePhases` functions:
+
+```{r}
+elk_phases <- elk_cp |>
+  estimatePhases()
+
+elk_phases_summ <- summarizePhases(elk_phases)
+
+```
+
+```{r}
+str(elk_phases_summ)
+```
+We can now merge our summarized phases object, which contains the time points for each changepoint, with our original data, using the tidyr R package function `fill` to fill in the missing values for each phase's data. 
+
+```{r}
+elk_phases_data <- merge(elk_example, elk_phases_summ, all = TRUE, by.x = c("datetime"), by.y = c("end")) |> arrange(datetime) |>
+  tidyr::fill(phase, start, model, eta, tau, rms, .direction = "updown")
+
+str(elk_phases_data)
+```
+
+Lastly, we can visualize the different models and phases over time and change in latitude:
+
+```{r}
+ggplot(data = elk_phases_data, aes(x = datetime, y = Y, color = model))+
+    geom_path(size=1)+
+    xlab("Datetime")+ylab("Latitude")+
+    theme_classic()
+```
+
+```{r}
+ggplot(data = elk_phases_data, aes(x = datetime, y = Y, color = phase))+
+    geom_path(size=1)+
+    xlab("Datetime")+ylab("Latitude")+
+    theme_classic()
+```
+
+
+
+

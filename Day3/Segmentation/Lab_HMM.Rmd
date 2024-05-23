@@ -1,0 +1,437 @@
+---
+title: "Segmentation: Hidden Markov Models"
+author: "Nicki Barbour and Elie Gurarie"
+subtitle: "[Brazil Move 2024 - UFMS - Campo Grande](https://eligurarie.github.io/BrazilMove2024)"
+date: "May 22, 2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
+                      warning = FALSE, cache = TRUE)
+```
+
+# Goals
+
+> To estimate a Multi-State Random Walk for some elk data, using the `momentuhmm` package. 
+
+We will use the processed elk data from Lab 1. 
+
+```{r}
+setwd("../../")
+load("./data/elk_processed.rda")
+head(elk_gps)
+```
+
+And load some uesful packages:
+
+```{r}
+library(ggplot2)
+library(plyr)
+```
+
+
+# Select Individuals (Non-Residential)
+
+We can one of the visualization methods we learned to examine the tracks for non-residential (migratory) behavior.
+
+```{r fig.height=15, fig.width=6}
+ggplot(data=elk_gps, aes(x=lon, y=lat)) +
+  geom_path(size=0.5) +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol=3)
+```
+
+We can select some of the individuals with clear distinctions between residential and transiting behavior (movement "blob" followed by a straight dispersal line and then a second movement "blob").
+
+```{r}
+elk_mig <- elk_gps |>
+  subset(id %in% 
+           c("YL96", "GP2", "YL25", "YL29", "YL73", "YL77", "YL78")) |>
+  mutate(id = droplevels(id))
+```
+
+We can visualize our selected tracks, looking at the change in latitude over time. Each track has a clear residential period in latitude, followed by a drop in latitude, a second residential period, and for most, a second spike in latitude as they disperse back to the first area of residency. 
+
+```{r ggplotTracks}
+ggplot(data=elk_mig, aes(x=datetime, y=lat)) +
+  geom_path(size=0.5) +
+  theme_classic() +
+  facet_wrap(~id, scale="free", ncol=2)
+```
+
+
+# Regularizing data with `AniMotum`
+
+> Note: You can also jump directly to the next section if regularization is not a big deal. 
+
+To properly fit a hidden Markov model, the data should ideally be *regularized* - i.e. the time intervals should be consistent.  
+
+A useful and very fast package for track regularization in R is  `AniMotum`. This package itself actually uses a fast-fitting state space model framework (similar to an HMM but taking into account locational error) to predict locations in regular time along a trajectory.
+
+You can read more about this package with the published paper, [Jonsen et al 2023](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.14060) and with the [AniMotum OVerview Vignette](https://ianjonsen.github.io/aniMotum/articles/Overview.html).
+
+You will need to install the package using the following code and ensuring that the latest versions of the `TMB` and `Matrix` R packages are also installed.
+
+```{r eval=FALSE}
+# install.packages("aniMotum", 
+#                 repos = c("https://cloud.r-project.org",
+#                           "https://ianjonsen.r-universe.dev"),
+#                 dependencies = TRUE)
+
+# install.packages("Matrix")
+# install.packages("TMB")
+```
+
+```{r}
+library(aniMotum)
+```
+
+For use with the aniMotum package, your data needs to have the following *exact* column names, order, and structure: `id`, `date` (POSIXct), `lc`, `lon`, `lat` and (optional) additional locational error information (e.g., `smaj`, `smin`, `eor` columns that come with Argos satellite tag data - reflecting the marine biology background of these tools).^[ARGOS quality = The column for lc (location class) - include the following values: 3, 2, 1, 0, A, B, Z, G, or GL. The latter two are for GPS locations and 'Generic Locations', respectively.  Class Z values are of assumed to have the same error variances as class B. By default, class G (GPS) locations are assumed to have error variances 10x smaller than Argos class 3 variances, but unlike Argos error variances, the GPS variances are the same for longitude and latitude.] 
+
+Since our data is from GPS collars, we will the class "G" option for the `lc` column. We're going to perform this analysis wiht 
+
+```{r}
+elk_mig2 <- elk_mig |>
+  mutate(lc = "G", date = datetime) |>
+  dplyr::select(id, date, lc, lon, lat)
+```
+
+We now need to choose a sampling rate to predict our locations to.
+
+This should be informed by the most prominent fix rates in your data. You can check this using the following code (see also in lab 1):
+
+```{r}
+dtime <- function(t, ...) {difftime(t[-1], t[-length(t)], ...) %>% as.numeric}
+
+require(dplyr)
+sample.rate <- elk_mig2 |> 
+  group_by(id) |>arrange(date) |>
+  summarize(dtime = round(dtime(date, units ="hours")))
+
+table(sample.rate$dtime)
+plot(table(sample.rate$dtime))
+```
+
+There are a few (very few) enormous gaps, and many that are less than 1/2 hour, but 2 hours seems like a good mode. 
+
+We can now fit the predictive model to our data, using the `fit_ssm` function and additional arguments, such as the maximum speed ("vmax", in m/s, and above which locations will be flagged as outliers), the desired time step ("time.step", in hours), and the model type ("rw" for random walk and "crw" for correlated random walk).
+
+We will use a reasonable max speed cut off of 20 m/s, a random walk model (works better for large gaps), add a time step of 2 hours.   
+
+> Note - this step can take a long time!   So we focus only on our friend "YL96" and also absolutely save this fit
+
+```{r eval=FALSE}
+myelk <- elk_mig2 |> subset(id == "YL96")
+myelk_ssm_fit <- fit_ssm(myelk,
+               vmax = 20,
+               model = "crw",
+               time.step = 2,
+               control = ssm_control(verbose = 0))
+```
+```{r saveSSMFITresults, eval = FALSE, echo = FALSE}
+setwd("../../")
+#save(elk_ssm_fit, file="./data/elk_ssm_fit.rda")
+save(myelk_ssm_fit, file="data/myelk_ssm_fit.rda")
+```
+
+
+```{r loadDataForAnalysis, echo = -1}
+setwd("../../")
+load("./data/myelk_ssm_fit.rda")
+myelk_reg <- elk_mig2 |> subset(id == "YL96")
+```
+
+We can use the `summary` function to look at the individual-level model results, including whether the models converged and AIC values.
+
+```{r summarySSM}
+summary(myelk_ssm_fit)
+```
+
+This is a "model" of the animal's movement that also allows you to "predict" the locations.  
+
+We can define a function, `extractPredictions`, to extract the predicted lat/lon coordinates for our data.
+
+```{r extactPredictionFunction}
+extractPredictions <- function(ssm_fit){
+  predictions <- data.frame(ssm_fit$ssm[[1]]$predicted) |>
+    sf::st_as_sf() |>
+    sf::st_transform(4326)
+  
+  coords <- sf::st_coordinates(predictions)
+  
+  predictions$lon <- coords[, 1]
+  predictions$lat <- coords[, 2]
+  
+  new_data <- predictions |> 
+    data.frame() |>
+    dplyr::select(id, date, lon, lat)
+  
+  return(new_data)
+}
+```
+
+We can apply the function to list of fitted models for each individual.
+
+```{r}
+myelk_regdata <- extractPredictions(myelk_ssm_fit)
+```
+
+The predicted locations can be visualized over the original locations, using the ggplot function and storing the plots within a for-loop to print the results for each individual.
+
+Let's compare the regular data with the original data:
+
+```{r compareRegularizedToOriginal, fig.width = 8, fig.height = 4, echo = -1}
+par(mar = c(3,2,1,1), mfrow = c(1,2))
+
+myelk <- subset(elk_gps, id == "YL96") |> dplyr::mutate(id = as.character(id))
+
+plot(lon~datetime, type = "o", pch = 19, data = myelk[1:100,])
+lines(lon~date, type = "o", pch = 4, col = 2, data = myelk_regdata[1:100,])
+legend("topright", legend = c("original", "regular"), pch = c(19,4), col = 1:2)
+
+plot(lon~lat, type = "o", pch = 19, data = myelk[1:100,])
+lines(lon~lat, type = "o", pch = 4, col = 2, data = myelk_regdata[1:100,])
+legend("topright", legend = c("original", "regular"), pch = c(19,4), col = 1:2)
+```
+
+We went ahead and performed this operation for many of those animals and saved them to a single "regularized" elk data frame which you can load:  
+
+```{r eval= FALSE, include=FALSE, echo = FALSE}
+#save(elk_regdata, file="./data/elk_regdata.rda")
+```
+
+```{r, echo = -1}
+setwd("../../")
+load(file="./data/elk_regdata.rda")
+```
+
+
+# Hidden Markov Model
+
+Hidden Markov Models (HMMs) can be used for time series data to describe 2 processes, one observed (e.g., the data produced by telemetry, such as locations and movement metrics) and one "hidden", representing the "hidden" ecological behaviors driving the observed data.
+
+The Markov chain portion of HMM's state that the probability of being in a particular behavior state at time $t+1$ is **only** dependent on the current state at time $t$. Once these probabilities are described, a transition probability matrix, or the probability of moving between behavior states, can be described. HMM's can have any number of hidden behavioral states, granted that they are biologically meaningful (model selection can also assist with determining the "optimal" number of states).
+
+Importantly, HMMs are performed in discrete time and assume that observations are "conditionally independent". These can be difficult for movement data derived from tags, which can be prone to irregularly spaced observations and errors.
+
+## Load the data
+
+Now that our data is regular space/time, we can use the methods we learned in lab 2 to make our data spatial, convert the coordinates to a projected coordinate system, and save the X/Y coordinates as columns in our data.
+
+```{r}
+library(sf)
+```
+
+Prepare 
+
+```{r, echo = -1}
+setwd("../../")
+load(file="./data/elk_regdata.rda")
+myelk_utm <- elk_regdata |> subset(id == "YL96") |> 
+  st_as_sf(coords = c("lon","lat"), crs = 4326) |>
+  st_transform(32611)
+```
+
+We will need the coordinates!  But the data should be a data frame
+
+```{r}
+myelk_utm <- cbind(myelk_utm, st_coordinates(myelk_utm)) |> data.frame()
+head(myelk_utm)
+```
+
+## Fit HMM: Two States
+
+Now that our data is regularized and we have our movement metrics annotated to our data, we can fit our HMM with the `momentuHMM` package, which is very flexible.  You can use  user-specified parameter distributions, options for hierarchical and multivariate models, biased correlated random walks and more. As usual, read the [vignette](https://cran.r-project.org/web/packages/momentuHMM/vignettes/momentuHMM.pdf).
+
+```{r}
+library(momentuHMM)
+```
+
+We first prepare our data using the `prepData` function to grab our X/Y coordinates.
+
+```{r}
+myelk_hmm_prep <- prepData(myelk_utm |> data.frame(), type = "UTM",
+                                    coordNames = c("X","Y")) 
+
+head(myelk_hmm_prep)
+```
+
+Note  that once again - this package made a data frame that computes all the things we computed, and `ltraj` computes. 
+
+It is important that step lengths be greater than 0:
+
+```{r}
+table(myelk_hmm_prep$step == 0)
+```
+
+MomentuHMM fits HMM's within a Bayesian framework, where prior distributions can be specified for each state-specific parameter to help distinguish the "true" behavioral state when combined with observed distributions. 
+
+We will start with a two-state model with state-specific and distribution specific parameters for each variable that will be used to distinguish our behavioral states, namely the step length and relative turning angles.
+
+We will make our priors somewhat informative, assuming that one state will be defined by smaller step lengths (smaller mean and sd) and bigger turning angles (smaller concentration parameter), with the opposite for the second state. 
+
+```{r}
+stepMean0 <- c(m1 = 100, m2 = 4000)
+stepSD0 <- c(sd1 = 50, sd2 = 1000)
+angleCon0 <- c(rho1  = 0.1, rho2 = 0.8)
+```
+
+We will now assign names to our states, with the slower, more tortuous state being defined as a "resident" state and the faster, straighter state as a "transit" state.
+
+```{r}
+stateNames <- c("resident","transit")
+```
+
+We now pick distributions for our variables of interest (step length and turning angle), using a Gamma distribution for the step lengths (`?dgamma`) and a Wrapped Cauchy distribution for the turning angles (`dwrpcauchy`).
+
+We store our priors defined in the code chunk above into a list object, "Par0".
+
+```{r}
+dist <- list(step = "gamma", angle = "wrpcauchy")
+Par0 <- list(step=c(stepMean0, stepSD0), angle = c(angleCon0))
+```
+
+We can now fit our HMM using the `fitHMM` function with our prepped data and objects from above. We also specify the number of states to identify ("nbStates").
+
+```{r}
+myelk_hmm_fit <- fitHMM(data = myelk_hmm_prep, nbStates = 2, dist = dist, 
+                      Par0 = Par0, stateNames = stateNames)
+
+print(myelk_hmm_fit)
+```
+
+After fitting our model, we can use the Viterbi formula with the `viterbi` function to decode the transition probabilities for the most likely states at each time point along our movement trajectory.
+
+```{r}
+hmm_states <- viterbi(myelk_hmm_fit)
+str(hmm_states)
+```
+
+We can add our predicted states as a column for each observation to our data:
+
+```{r}
+myelk_utm$state <- hmm_states
+```
+
+### Plot 2-state predictions
+
+The default plotting of `momentuhmm` is quite useful: 
+
+```{r DefaultTwoStatePlot, echo  = 2, eval = 1}
+plot(myelk_hmm_fit, ask = FALSE)
+plot(myelk_hmm_fit)
+```
+
+
+We can then plot the results, using Base R to make multidimensional plots of the trajectory with the annotated states:
+
+```{r TwoState_ScanTtrack}
+layout(cbind(c(1,1),2:3))
+par(bty = "l", mar = c(2,2,2,2))
+
+with(myelk_utm, {
+  plot(X, Y, asp =1, col = c("orange","blue")[state], pch = 19, cex = 0.7)
+  segments(X[-length(X)], Y[-length(Y)], 
+           X[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
+  plot(date, X, col = c("orange","blue")[state], pch = 19, cex = 0.7)
+  segments(date[-length(X)], Y[-length(Y)], 
+           date[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
+  plot(date, Y, col = c("orange","blue")[state], pch = 19, cex = 0.7)
+  segments(date[-length(X)], Y[-length(Y)], 
+           date[-1], Y[-1], col = c("orange","blue")[state[-length(state)]])
+})
+```
+
+We can also convert our data to an sf structure and use the methods we learned in lab 1 to plot the trajectory with each location colored by the predicted state with the mapview package.
+
+```{r}
+library(mapview)
+```
+
+
+```{r}
+myelk_sf <- myelk_utm |>
+  st_as_sf(coords=c("X","Y"), crs= 32611) |>
+  st_transform(4326) |>
+  mutate(state = as.character(state))
+
+myelk_track <- myelk_sf |>
+  summarize(do_union=FALSE) |> 
+  st_cast("LINESTRING")
+
+mapview(myelk_track, color="darkgrey") +
+  mapview(myelk_sf, zcol="state", col.regions=c("orange","blue"))
+```
+
+We can see from the plot that our movement "blobs" still have a mixture of both colors. We can try fitting a multivariate HMM, with latitude as a covariate, to assist with further separating our two states along our movement track.
+
+This may suggest that there are actually 3 behavioral states here: one that is fast and straight (blue state), one that is slower and tortuous (orange state), and a third that is intermediate, where the animal is having directed, faster movements within its residential patch.
+
+
+## Fit HMM: 3-State Model
+
+We can fit a 3 state model by simply adding an additional state-specific prior for each movement variable.
+
+```{r Priors_ThreeState}
+stepMean0 <- c(m1 = 50, m2 = 2000, m3 = 200)
+stepSD0 <- c(sd1 = 50, sd2 = 1000, sd3 = 100)
+angleCon0 <- c(rho1  = 0.1, rho2 = 0.8, rho3 = 0.2)
+```
+
+We will label this third state as an additional "faster" residential state.
+
+```{r}
+stateNames <- c("resident-slow","transit", "resident-faster")
+```
+
+```{r}
+dist <- list(step = "gamma", angle = "wrpcauchy")
+Par0 <- list(step=c(stepMean0, stepSD0), angle = c(angleCon0))
+```
+
+We re-fit the model as before, but this time specifying 3 states.
+
+```{r Fit_ThreeState}
+myelk_hmm_threestate <- fitHMM(data = myelk_hmm_prep, nbStates = 3, 
+                         dist = dist, Par0 = Par0, 
+                         stateNames = stateNames, 
+                         formula = ~1)
+```
+
+```{r}
+myelk_hmm_threestate
+```
+
+
+We can decode our model results and bind the predicted states for each observation back to our data:
+
+```{r}
+hmm_3states <- viterbi(myelk_hmm_threestate)
+myelk_utm$state <- hmm_3states
+```
+
+### Plot 3-sate predictions
+
+Now if we plot the results with our new state in green, we can see that our model did a much better job at finding our transiting state and two residential states within our movement "blobs"!
+
+```{r ThreeStateDefaultPlot, echo = 2, eval = 1}
+plot(myelk_hmm_fit, ask = FALSE)
+plot(myelk_hmm_fit)
+```
+
+Here is a mapview: 
+
+```{r ThreeStateMapview}
+myelk_track <- myelk_sf |>
+  summarize(do_union=FALSE) |> 
+  st_cast("LINESTRING")
+myelk_sf <- myelk_sf |> mutate(state = hmm_3states)
+mapview(myelk_track, color="darkgrey") +
+  mapview(myelk_sf, zcol="state", col.regions=c("orange","blue", "green"))
+```
+
+

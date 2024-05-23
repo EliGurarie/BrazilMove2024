@@ -1,5 +1,5 @@
 ---
-title: "Segmentation Methods 1: Lavielle"
+title: "Segmentation: First Passage Time"
 author: "Nicki Barbour and Elie Gurarie"
 subtitle: "[Brazil Move 2024 - UFMS - Campo Grande](https://eligurarie.github.io/BrazilMove2024)"
 date: "May 22, 2024"
