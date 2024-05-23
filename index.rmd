@@ -63,18 +63,18 @@ The course will mix lectures on concepts, theory and tools with practical labs u
 The outline of the course below is approximate.  We'll be posting links to materials (lecture and labs) as the course proceeds.  
 
 
-# Schedule 
+# Day 1: Monday, May 20
 
-## Day 1: Monday, May 20
+## Overview
 
-- [Overview](Day1/01_Overview/Overview.html)
+- [Slides](Day1/01_Overview/Overview.html)
 
 <font color = "darkred"> 
 **Present:** *about yourself*
 Please come prepared with 2-3 slides to introduce yourself, your study system, your ecological questions, and a brief description of your data. 
 </font>
 
-### Topic: Processing Movement Data
+## Topic: Processing Movement Data
 
 - [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
 
@@ -83,49 +83,50 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
   
 **Guest Lecture from [Sarah Davidson](https://www.ab.mpg.de/person/98230/2736)** - from [Movebank](https://www.movebank.org/cms/movebank-main) 
 
-### Topic: Visualizing Movement Data
+## Topic: Visualizing Movement Data
 
 - [**R** Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html) ([code](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.R))
 
 
-## Day 2: Tuesday, May 21
+# Day 2: Tuesday, May 21
 
-### Topic: Complex Numbers are Simple
+## Topic: Complex Numbers (are simple)
 
 - [Lecture/Lab](Day2/04_ComplexNumbers/ComplexNumbers.html)
 - See also book chapter [here](https://eligurarie.github.io/MovementEcologyBook/part2_data_and_manipulations/complex_numbers.html).  
 
-### Topic: Statistical Summaries
+## Topic: Statistical Summaries
 
 - [Lecture/Lab](Day2/05_StatisticalSummaries/Lab_StatisticalSummaries.html)
 
-## Day 3: Wednesday, May 22
+# Day 3: Wednesday, May 22
+
+## Topic: Movement Models
+
+- [Lecture: Discrete Movement Models](Day3/06_MovementModels/DiscreteMovementModels.html)
 
 
-### Topic: Movement Models
-
-- [Lecture](Day3/06_MovementModels/DiscreteMovementModels.html)
-
-
-### Topic: **Segmentation**
+## Topic: Segmentation
 
 - [Lecture](Day3/Segmentation/Segmentation.html)
 - [Lab - Lavielle Segmentation](Day3/Segmentation/Lab_LavielleSegmentation.html) ([R code](Day3/Segmentation/Lab_LavielleSegmentation.R))
 - [Lab - First Passage Time](Day3/Segmentation/Lab_FPT.html) ([R code](Day3/Segmentation/Lab_FPT.R))
+- [Lab - Multi-State Random Walk](Day3/Segmentation/Lab_HMM.html) ([R code](Day3/Segmentation/Lab_HMM.R))
 
 <font color = "darkred"> 
 **Exercise:** *Apply a movement model or segmentation method to your data.*
 </font>
 
-### Afternoon:  **Home Range Analyses**
+# Day 4: Thursday, May 23
+
+## Topic:  **Home Range Analyses**
 
 - Mininum convex polygon
 - Kernel density estimates
 - Auto-correlated kernel density estimates
 
-## Day 4: Thursday, May 23
-
-### Morning: **Resource Selection**
+<!--
+## Morning: **Resource Selection**
 
 <font color = "darkred"> 
 **Present:** results from the previous day 
@@ -133,17 +134,16 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 
 - resource selection functions
 - step-selection functions
-
-### Afternoon:  **Open Work Session**
-
-## Day 5: Friday, May 24
-
-### Morning: Special Topics
-
-By Gustavo and/or James and/or Nicki and/or Elie on selected topics of particular interest to students
+-->
 
 
-### Afternoon: **Final Presentations**
+# Day 5: Friday, May 24
+
+## Morning: Special Topics
+
+- Open Work Session and Special Topics by Request
+
+## Afternoon: **Final Presentations**
 
 <font color = "darkred">
 
