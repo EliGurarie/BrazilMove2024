@@ -12,7 +12,8 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
+                      cache = TRUE)
 ```
 
 # Goal
@@ -21,7 +22,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 Packages:
 
-```{r}
+```{r, cache = FALSE}
 library(ggplot2)
 library(plyr)
 library(sf)
@@ -68,7 +69,8 @@ Similar to the `mcp` function, the `kernelUD` and `getverticeshr` functions are 
 
 We'll do it here for one animal:
 
-```{r}
+```{r PickAnElk}
+myelk_sf <- elk_res_sf |> subset(id == "YL80")
 myelk_sp <- myelk_sf |>  as_Spatial() 
 myelk_kernelud <- kernelUD(myelk_sp, grid = 200)
 ```
@@ -90,21 +92,21 @@ plot(my_kernel)
 
 And you can even use this in a mapview:
 
-```{r}
+```{r mapviewKernel, cache = FALSE}
 mapview(my_kernel)
 ```
 
 Contours can be helpful:
 
 
-```{r}
+```{r contourPlotKernel}
 plot(my_kernel)
 contour(my_kernel, add = TRUE)
 ```
 
 Or, for fun, a 3D plot:
 
-```{r}
+```{r PerspPlotKernel}
 persp(my_kernel, border = NA, shade = TRUE)
 ```
 
@@ -117,8 +119,72 @@ From this, you can calculate a few metrics.  For example, if you want the border
 ```{r getKDEpolygon}
 myelk_kde_poly <- getverticeshr(myelk_kernelud, percent = 95) |>
   st_as_sf()
+myelk_kde_poly
+```
+
+Note, that you can easily obtain the area of this polygon
+
+```{r getArea}
+st_area(myelk_kde_poly)
+```
+
+And map this:
+
+```{r mapview2, cache =FALSE}
 mapview(myelk_kde_poly) + mapview(myelk_sf)
 ```
+
+
+We can also write a function that obtains all this information:
+
+```{r getKernelPolyFunction}
+getKernelPoly <- function(sf, percent = 95, ...){
+  sp <- sf |> mutate(id = droplevels(id)) 
+    as_Spatial(sp[,"id"], cast = TRUE, IDs = "id") |> kernelUD(...) |>
+    getverticeshr(percent = 95) |> 
+    st_as_sf()
+}
+```
+
+You can use this to compare different parameters, like kernel choice (remember the differenve between the `bivnorm` and `epa` kernels): 
+
+
+```{r ComparingKernels}
+kde_poly_norm <- getKernelPoly(elk_sf |> subset(id == "YL91"), kern = "bivnorm") 
+kde_poly_epa <- getKernelPoly(elk_sf |> subset(id == "YL91"), kern = "epa") 
+
+kde_compare_kernels <- rbind(
+  kde_poly_norm |> mutate(type = "Bivariate Normal"),
+  kde_poly_epa |> mutate(type = "Epanechnikov"))
+
+ggplot(kde_compare_kernels) + geom_sf(aes(fill = type), alpha = .5) + 
+    geom_sf(data = elk_sf |> subset(id == "YL91"), alpha = .2, size = 1)
+```
+
+
+
+Or ... you cam compute all of the kerners for a bunch of individuals(!)
+
+```{r computeAllMCPs}
+MCP_allElks <- getKernelPoly(elk_sf |> st_transform(32611), kern = "epa") 
+```
+ 
+All the MCP's plotted:
+ 
+```{r mapAllMCPs}
+ggplot(MCP_allElks) + 
+  geom_sf(aes(fill = id, color = id), alpha = .2)
+```
+
+Now we can get some real statistics:
+
+```{r AndSummarize}
+MCP_allElks
+summary(MCP_allElks$area)
+```
+
+Amazing variation in the kernel estimates!
+
 
 
 # Kernel overlaps
@@ -126,10 +192,6 @@ mapview(myelk_kde_poly) + mapview(myelk_sf)
 [Fieberg and Kochanny 2010](https://wildlife.onlinelibrary.wiley.com/doi/abs/10.2193/0022-541X(2005)69[1346:QHOTIO]2.0.CO;2) argue convincingly that if you are esimating overlap between multiple organisms, you should leverage the power of the whole kernel density. 
 
 Let's get two kernel densities:
-
-```{r}
-myB.overlap <- kerneloverlap(myB.sp[,"n1"], method = "VI", ...)
-```
 
 
 ```{r computeTwoKernels}
@@ -139,6 +201,27 @@ elk2 <- elk_res_sf |> subset(id == "YL94")
 kernel1 <- elk1 |>  as_Spatial() |>  kernelUD(grid = 200)
 kernel2 <- elk2 |>  as_Spatial() |>  kernelUD(grid = 200)
 ```
+
+Plotting both kernels as contours:
+
+```{r Countour2Kernels}
+contour(kernel1, 
+        xlim = c(590e3, 610e3), ylim = c(5720e3, 5745e3), 
+        col = "blue")
+ contour(kernel2, add = TRUE, col = "red")
+axis(1); axis(2)
+```
+
+To compute overlap, you just have to convert your `sf` list of objects into a `SpatialPointsDataFrame` - but - importantly, identify `id` as the ID column. 
+
+The `VI` is the "volume overlap" measure.  
+
+```{r}
+threeElks_sp <- as_Spatial(elk_res_sf[,"id"], cast = TRUE, IDs = "id")
+kerneloverlap(threeElks_sp, method = "VI", kern = "epa")
+```
+
+Note how high that overlap is! 
 
 
 

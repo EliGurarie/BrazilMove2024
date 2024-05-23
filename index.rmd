@@ -122,7 +122,7 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 ## Topic:  **Home Range Analyses**
 
 - [Lab - Mininum convex polygon](Day4/HomeRanges_MCP.html) ([R lab](Day4/HomeRanges_MCP.R))
-- Kernel density estimates
+- [Lab - Kernel density estimates](Day4/HomeRanges_KDE.html) ([R lab](Day4/HomeRanges_KDE.R))
 - Auto-correlated kernel density estimates
 
 <!--
