@@ -1,0 +1,236 @@
+ 
+# KDE
+
+Kernel density estimation (KDE) is a slightly more complex method used to calculate homerange areas, also using the `adehabitatHR` package. As defined by this package, it essentially defines the KDE homerange as the "*minimum area in which an animal has some specified probability of being located*".
+
+KDE applies a user-specified function to input points/locations in order to predict the probability of occurrence or the "utilization distribution", within each pixel of a user-specified grid. The choice of resolution for this grid can have a trade-off, with a finer resolution being more memory-intensive to calculate. The choice of this resolution should be informed by the resolution of the input data.
+
+A commonly used function for KDE (and the default for the adehabitatHR package function, `kernelUD`) is the "bivariate normal kernel". This function takes a set of individual observations, a parameter for the number of observations, and *importantly*, a user-specified parameter for the smoothing factor, *h* (also called the "bandwidth"). The choice of the value for this *h* parameter can significantly impact results, with a larger *h* resulting in more smoothing or a larger distance over which a data point influences the utlization distribution. The adehabitatHR package uses the "reference bandwidth" as a default with its `kernelUD` function but additional options exist (e.g., the "least-square cross validation method" or a user-chosen value).
+
+Users can also specify the percentage of density to use for homerange estimation (usually 50-95%), within the `getverticeshr` function, which calculates the homerange area using the estimated utilization distribution from the `kernelUD` function.
+
+Similar to the `mcp` function, the `kernelUD` and `getverticeshr` functions are applied to one individual at a time. To apply to all individuals at once, we can write our own function. The function takes an individual sf object, a user-specified grid, and a user-specified percent. It then converts the data into "SpatialPoints" format and applies the `kernelUD` and `getverticeshr` to get the estimated homerange contour. The contour is then converted back to an sf object (as a POLYGON) and the area of the polygon is calculated using the `st_area`. This area is added as a column to our output homerange polygon object.
+
+We'll do it here for one animal:
+
+```{r}
+myelk_sp <- myelk_sf |>  as_Spatial() 
+myelk_kernelud <- kernelUD(myelk_sp, grid = 200)
+myelk_homerangecontour <- getverticeshr(myelk_kernelud, percent = 95)
+myelk_poly <- st_as_sf(myelk_homerangecontour)
+mapview(myelk_poly) + mapview(myelk_sf)
+```
+
+This can, of course, be "piped" and put in a function
+
+```{r}
+
+mysf <- myelk_sf
+getKernelUD <- function(mysf, grid = 200, percent = 95){
+  myelk_sf |>  as_Spatial(IDs= "id") |> 
+    kernelUD(grid = grid) |>
+    getverticeshr(percent = percent) |> 
+    st_as_sf()
+}
+
+```
+
+```{r}
+getKernelUD(myelk_sf)
+```
+
+But this function also works for multiple animals:
+
+```{r}
+allKernels <- getKernelUD(elk_res_sf)
+plot(st_geometry(allKernels))
+```
+
+
+We apply our new `findKDE` function, using a 200 x 200 (pixel, with pixels in units the same as your coordinate reference system, e.g., meters) grid and using 95% for the density estimation cut-off.
+
+```{r}
+elk_kde <- lapply(elk_id,
+  findKDE,
+  grid = 200,
+  percent =95
+)
+```
+
+The output is a list of KDE objects for each individual - we can look at the KDE object, including estimated area, for one of these individuals, "YL80".
+
+```{r}
+elk_kde["YL80"]
+```
+
+The output KDE objects can also be mapped interactively with mapview! 
+
+How do these KDE homeranges compare to our MCP homeranges?
+
+```{r}
+mapview(elk_kde["YL80"], col.regions="red", map.types="Esri.WorldImagery")+
+  mapview(elk_kde["YL91"], col.regions="orange")+
+  mapview(elk_kde["YL94"], col.regions="blue")
+```---
+title: 'Home Range Analyses: Minimum Convex Polygon'
+author: "Nicki Barbour and Elie Gurarie"
+subtitle: "[Brazil Move 2024 - UFMS - Campo Grande](https://eligurarie.github.io/BrazilMove2024)"
+date: "May 23, 2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Goal
+
+> To estimate home ranges with Minimum Convex Polygons and Kernel Density Estimates. 
+
+Packages:
+
+```{r}
+library(ggplot2)
+library(plyr)
+library(sf)
+library(adehabitatHR)
+library(mapview)
+```
+
+
+# Selecting some animals
+
+```{r loadData, echo = -1}
+setwd("../")
+load("./data/elk_processed.rda")
+head(elk_gps)
+```
+
+We've picked out 3 individuals that are, largely, non-migratory but resident - and also add some X-Y coordinates:
+
+```{r SelectResidentElk}
+elk_res <- elk_gps |>
+  subset(id %in% c("YL80", "YL91", "YL94")) |>
+  mutate(id = droplevels(id))
+
+elk_res_sf <- elk_res |> 
+  st_as_sf(coords = c("lon","lat"), crs = 4326) |> 
+  st_transform(32611) 
+
+elk_res <- cbind(elk_res, st_coordinates(elk_res_sf))
+str(elk_res)
+```
+
+## Visualize Tracks
+
+Let's start off by visualizing our selected tracks, using some of the methods we learned in lab 1.  We can see that these tracks have a nice "blob" of movement, indicating residential behavior suitable for home range analysis. 
+
+
+```{r ThreeElkMapped}
+ggplot(data=elk_res, aes(x=X, y=Y, col = id)) +
+  geom_path() + coord_fixed() + ggtitle("Some (mostly) resident elk")
+```
+
+These are *generally* resident animals, with a LOT of overlap, but also, clearly, some long-distance movements. 
+
+Here's a mapview:
+
+```{r}
+elk_tracks <- elk_res_sf |> 
+  group_by(id) |> 
+  summarize(do_union=FALSE) |> 
+  st_cast("LINESTRING")
+
+mapview(elk_tracks,zcol="id")
+```
+
+
+
+ 
+# KDE
+
+Kernel density estimation (KDE) is a slightly more complex method used to calculate homerange areas, also using the `adehabitatHR` package. As defined by this package, it essentially defines the KDE homerange as the "*minimum area in which an animal has some specified probability of being located*".
+
+KDE applies a user-specified function to input points/locations in order to predict the probability of occurrence or the "utilization distribution", within each pixel of a user-specified grid. The choice of resolution for this grid can have a trade-off, with a finer resolution being more memory-intensive to calculate. The choice of this resolution should be informed by the resolution of the input data.
+
+A commonly used function for KDE (and the default for the adehabitatHR package function, `kernelUD`) is the "bivariate normal kernel". This function takes a set of individual observations, a parameter for the number of observations, and *importantly*, a user-specified parameter for the smoothing factor, *h* (also called the "bandwidth"). The choice of the value for this *h* parameter can significantly impact results, with a larger *h* resulting in more smoothing or a larger distance over which a data point influences the utlization distribution. The adehabitatHR package uses the "reference bandwidth" as a default with its `kernelUD` function but additional options exist (e.g., the "least-square cross validation method" or a user-chosen value).
+
+Users can also specify the percentage of density to use for homerange estimation (usually 50-95%), within the `getverticeshr` function, which calculates the homerange area using the estimated utilization distribution from the `kernelUD` function.
+
+Similar to the `mcp` function, the `kernelUD` and `getverticeshr` functions are applied to one individual at a time. To apply to all individuals at once, we can write our own function. The function takes an individual sf object, a user-specified grid, and a user-specified percent. It then converts the data into "SpatialPoints" format and applies the `kernelUD` and `getverticeshr` to get the estimated homerange contour. The contour is then converted back to an sf object (as a POLYGON) and the area of the polygon is calculated using the `st_area`. This area is added as a column to our output homerange polygon object.
+
+We'll do it here for one animal:
+
+```{r}
+myelk_sp <- myelk_sf |>  as_Spatial() 
+myelk_kernelud <- kernelUD(myelk_sp, grid = 200)
+myelk_homerangecontour <- getverticeshr(myelk_kernelud, percent = 95)
+myelk_poly <- st_as_sf(myelk_homerangecontour)
+mapview(myelk_poly) + mapview(myelk_sf)
+```
+
+This can, of course, be "piped" and put in a function
+
+```{r}
+
+mysf <- myelk_sf
+getKernelUD <- function(mysf, grid = 200, percent = 95){
+  myelk_sf |>  as_Spatial(IDs= "id") |> 
+    kernelUD(grid = grid) |>
+    getverticeshr(percent = percent) |> 
+    st_as_sf()
+}
+
+```
+
+```{r}
+getKernelUD(myelk_sf)
+```
+
+But this function also works for multiple animals:
+
+```{r}
+allKernels <- getKernelUD(elk_res_sf)
+plot(st_geometry(allKernels))
+```
+
+
+We apply our new `findKDE` function, using a 200 x 200 (pixel, with pixels in units the same as your coordinate reference system, e.g., meters) grid and using 95% for the density estimation cut-off.
+
+```{r}
+elk_kde <- lapply(elk_id,
+  findKDE,
+  grid = 200,
+  percent =95
+)
+```
+
+The output is a list of KDE objects for each individual - we can look at the KDE object, including estimated area, for one of these individuals, "YL80".
+
+```{r}
+elk_kde["YL80"]
+```
+
+The output KDE objects can also be mapped interactively with mapview! 
+
+How do these KDE homeranges compare to our MCP homeranges?
+
+```{r}
+mapview(elk_kde["YL80"], col.regions="red", map.types="Esri.WorldImagery")+
+  mapview(elk_kde["YL91"], col.regions="orange")+
+  mapview(elk_kde["YL94"], col.regions="blue")
+```
+
+
+
+
+
+
+
+
+
+
+

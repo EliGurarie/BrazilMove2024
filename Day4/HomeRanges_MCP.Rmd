@@ -65,7 +65,8 @@ These are *generally* resident animals, with a LOT of overlap, but also, clearly
 
 Here's a mapview:
 
-```{r}
+```{r mapviewElkTracks}
+require(dplyr)
 elk_tracks <- elk_res_sf |> 
   group_by(id) |> 
   summarize(do_union=FALSE) |> 
