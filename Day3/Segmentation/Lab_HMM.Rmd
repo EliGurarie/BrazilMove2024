@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE,
 
 We will use the processed elk data from Lab 1. 
 
-```{r}
+```{r, echo = -1}
 setwd("../../")
 load("./data/elk_processed.rda")
 head(elk_gps)
