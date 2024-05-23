@@ -16,8 +16,12 @@ knitr::opts_knit$set(root.dir = "C:/Users/nicol/Documents/BrazilMove2024")
 
 # Load in Data
 
+First we will load in our processed elk data from lab 1.
+
 ```{r}
 load("./data/elk_processed.rda")
+
+str(elk_gps)
 ```
 
 ```{r}
@@ -26,20 +30,36 @@ library(sf)
 library(dplyr)
 ```
 
+# Select Individuals & Make Data Spatial
+
+Next we will select 5 individuals with residential-like behavior.
+
 ```{r}
 
-elk_res <- elk_processed |>
-  filter(id %in% c("YL58","YL64","YL80", "YL91", "YL94"))
+elk_res <- elk_gps |>
+  filter(id %in% c("YL58","YL64","YL80", "YL91", "YL94")) |>
+  mutate(id = as.character(id))
 
 ```
+
+We will make this data spatial using the sf package and then will transform the coordinate reference system to UTM (units in meters), using the `st_transform` function.
 
 ```{r}
 elk_res_sf <- elk_res |>
   st_as_sf(coords = c("lon","lat"), crs=4326) |>
   st_transform(32611)
+
+elk_res_sf
 ```
 
 
+# Load in Covariates
+
+Next we will load in some covariates.
+
+We want to see if elk demonstrate preference (or avoidance) of human-made/used trails and roads AND particular landcover categories.
+
+Our human trails and roads data is stored as a shapefile (".shp" format). We can read it in using the `st_read` function, using our native pipe `|>` to transform the CRS to the same UTM zone/EPSG code as our elk data. 
 
 ```{r}
 trails_and_roads <- st_read("./Hebblewhitematerials/data/humanacess.shp") |>
@@ -50,16 +70,27 @@ trails_and_roads <- st_read("./Hebblewhitematerials/data/humanacess.shp") |>
 str(trails_and_roads)
 ```
 
+It is SUPER important that as you go, you check that ALL your spatial layers have the *same coordinate reference system*. 
+
+You can do that with the `st_crs` function and the `==` conditional statement (to check if the CRS one of spatial object matches the CRS of another spatial object).
+
 ```{r}
 st_crs(trails_and_roads)==st_crs(elk_res_sf)
 ```
 
+We can use Base R to make a quick plot of the geometry for our trails and roads (spatial lines) and elk locations (spatial points).
 
+We use the argument "add=TRUE" to add our elk spatial data on top of our trails and roads.
 
 ```{r}
 plot(st_geometry(trails_and_roads))
 plot(elk_res_sf$geometry, add=TRUE, col="green")
 ```
+
+Our landcover data is a raster in a ".tiff" file format (other possible formats include 
+.asc", ".dem", etc...). Rasters are images, where data is stored in a grid of pixels/cells with a particular resolution. 
+
+We can use the "raster" R package and its `raster` function to read in raster data. 
 
 ```{r}
 library(raster)
@@ -70,38 +101,92 @@ library(raster)
 landcover <- raster("./Hebblewhitematerials/data/landcover.tif")
 ```
 
+Printing out our new raster object shows us some helpful summary information, including the dimensions (in cell number), the resolution (size of each cell, with units the same as coordinate reference system), the spatial extent, the coordinate reference system (crs), and the min/max values stored in the cells of the raster.
+
 ```{r}
 landcover
 ```
+
+We can also extract information on our raster resolution, CRS, spatial extent, and min/max values using specific functions from the "raster" package:
+
+```{r}
+res(landcover)
+```
+
+```{r}
+CRS(landcover)
+```
+
+```{r}
+extent(landcover)
+```
+
+```{r}
+minValue(landcover)
+```
+
+```{r}
+maxValue(landcover)
+```
+
+
+
+
+
+
+We can use the `plot` function to get a quick plot of our raster. Here, different numeric cell values represent different discrete landcover categories.
+
 ```{r}
 plot(landcover)
 ```
+Similar to our other spatial layers, we HAVE to make sure that the CRS of our raster MATCHES the CRS of our other spatial layers before proceeeding and trying to combine them.
+
+We can use the `projectRaster` function to match the CRS of our raster to the CRS of our elk data.
+
 ```{r}
 landcover <- projectRaster(landcover, crs = crs(elk_res_sf))
 ```
 
-0 - NA
-1 - Open Conifer Forest
-2 - Moderate Conifer Forest
-3 - Closed Conifer Forest
-4 - Deciduous Forest
-5 - Mixed Forest
-6 - Regeneration
-7 - Herbaceous
-8 - Shrub
-9 - Water
-10 - Rock-Ice
-11 - Cloud
-12 - Burn-Forest
-13 - Burn-Grassland
-14 - Burn-Shrub
-15 - Alpine Herb
-16 - Alpine Shrub
+Next we want to look at all of the unique values stored in our raster, using the helpful `unique` function and using the `sort` function to sort the values in increasing order. 
+
+We know from our metadata that these values correspond to particular landcover categories, as follows:
+
+  0 - NA
+  1 - Open Conifer Forest
+  2 - Moderate Conifer Forest
+  3 - Closed Conifer Forest
+  4 - Deciduous Forest
+  5 - Mixed Forest
+  6 - Regeneration
+  7 - Herbaceous
+  8 - Shrub
+  9 - Water
+  10 - Rock-Ice
+  11 - Cloud
+  12 - Burn-Forest
+  13 - Burn-Grassland
+  14 - Burn-Shrub
+  15 - Alpine Herb
+  16 - Alpine Shrub
 
 
 ```{r}
 sort(unique(round(landcover@data@values)))
 ```
+
+We don't really need all of these detailed categories.
+
+We can use the `reclassify` function to simply these categories, as follows:
+
+  0 - NA
+  1 - Forest (Conifer, Deciduous, Mixed)
+  2 - Regeneration
+  3 - Herbaceous/Shrub
+  4 - Water
+  5 - Rock-Ice
+  6 - Cloud
+  7 - Burned (Forest, Grassland, Shrub)
+  8 - Alpine (Herb, Shrub)
 
 ```{r}
 landcover_rc <- reclassify(landcover, c(-Inf, 0, 0,
@@ -123,21 +208,12 @@ landcover_rc <- reclassify(landcover, c(-Inf, 0, 0,
                                        15, Inf, 8))
 ```
 
-0 - NA
-1 - Forest (Conifer, Deciduous, Mixed)
-2 - Regeneration
-3 - Herbaceous/Shrub
-4 - Water
-5 - Rock-Ice
-6 - Cloud
-7 - Burned (Forest, Grassland, Shrub)
-8 - Alpine (Herb, Shrub)
-
+Now if we take a look at our unique values, we only have values from 0-8 (much simpler!)
 
 ```{r}
 sort(unique(round(landcover_rc@data@values)))
 ```
-
+We can plot our new reclassified raster and add our elk points on top to see how they intersect with our landscape variable:
 
 ```{r}
 plot(landcover_rc)
@@ -147,8 +223,33 @@ plot(st_geometry(elk_res_sf), add=TRUE)
 
 # Resource Selection Function
 
+Resource selection functions (RSF's) are useful tools for quantifying the probability of animal occurrence as a function of available space, resources (e.g., elevation, landscape type, etc), and human use or disturbance (e.g., roads and trails).
+
+The strategy for performing an RSF is as follows:
+
+ * Find "used" locations (e.g., the locations from your tracking or animal observation data)
+ 
+ * Define availability and sample "available" locations
+ 
+ * Extract environmental covariates for both "used" and "available" locations
+ 
+ * Perform logistic regression on the "used" vs. "available" variable with the extracted covariates as explanatory factors
+ 
+ * Make predictions of relationships (usually a map)
+ 
+These logistic regressions can be fit using a generalized linear model (GLM), generalized linear mixed model (GLMM), or generalized additive model (GAM) framework, with a binomial family structure to account for the "0/1" (0 for "available", 1 for "used") binary response variable. 
+
+When fitting a linear model framework (e.g., GLM or GLMM), positive coefficients for the fitted model indicate "preference" for a particular variable whereas negative coefficients indicate "avoidance" for a particular variable. 
 
 ## Determine "Available" Locations
+
+We already have our "used" locations defined as our elk spatial point data.
+
+We now need to define our "available" locations, which is essentially where the animal *could have* chosen to be.
+
+The steps for this are to first define the *available space* and then randomly sample a good number of locations (generally, greater or equal to the number of observed, actual locations) within this available space to create our "available" locations.
+
+We can use the `mcp` function from the "adehabitatHR" package to create a tight polygon around our observed locations and define our "available" space.
 
 ```{r}
 library(sp)
@@ -161,6 +262,10 @@ library(adehabitatHR)
 elk_mcp <- mcp(as_Spatial(elk_res_sf), 100)
 
 ```
+
+We can then write a little function, `determineAvilableLocations`, to randomly sample within this space for each individual and store the "used" vs. "available" locations as binary choice variables in our data (with TRUE for used and FALSE for available).
+
+The function will return a dataframe with the "Used" column having a TRUE for locations that are categorized as "used" and a FALSE for locations that are categorized as "available".
 
 ```{r}
 determineAvailableLocations <- function(used_data, mcp){
@@ -183,10 +288,15 @@ determineAvailableLocations <- function(used_data, mcp){
 }
 ```
 
+To apply this function to every individual in our data, we first split our sf object into a list of dataframes for each individual.
+
 ```{r}
 elk_id <- split(elk_res_sf, elk_res_sf$id)
 ```
 
+We can then use the `lapply` function to apply our function to every individual dataframe in our new list object - the resulting object is also a list. 
+
+We can bind all of our individual dataframes back together using the `do.call` and `rbind` functions.
 
 ```{r}
 
@@ -197,23 +307,33 @@ elk_id_combine <- lapply(elk_id,
 elk_combine <- do.call("rbind", elk_id_combine)
 ```
 
-## Create Covariates
+## Extract Environmental Covariates for Each "Used" and "Available" Location
+
+### Trails and Roads Data
+
+We want to create a covariate for whether elk are more likely to come within proximity of a road or not.
+
+We will define "proximity" as elk coming within 250 meters of a trail or road feature. 
+To create this covariate, we first will convert our MCP object into an sf format.
 
 ```{r}
 elk_mcp_sf <- elk_mcp |>
   st_as_sf()
 ```
 
+Since our trails and roads sf object has a larger spatial extent than our elk MCP object, we can then use the `st_crop` function to "crop" the spatial extent of our trails and roads sf object to the smaller spatial extent our elk MCP object.
+
 ```{r}
 trails_and_roads2 <- st_crop(trails_and_roads, elk_mcp_sf)
 ```
 
-do elk come within 250 m of trails?
+We then use the `st_buffer` function to add a 250 meter buffer around our new, cropped trails and roads object.
 
 ```{r}
 trails_and_roads_buff <- st_buffer(trails_and_roads2, 250) 
 ```
 
+We can use the mapview package to visualize our trails and roads object with our new buffer AND our elk locations, specifying only to plot the locations where "Used=TRUE" (observed locations).
 
 ```{r}
 library(mapview)
@@ -225,6 +345,9 @@ mapview(trails_and_roads2)+
   mapview(subset(elk_combine, Used==TRUE))
 ```
 
+We now need to create a new column for whether elk are within 250 meters of a road/trail ("Near_Trail=TRUE") or not ("Near_Trail=FALSE).
+
+We can do this by adding a new column to our trails and roads object called "Near_Trail", setting all values to TRUE.
 
 ```{r}
 trails_and_roads_buff$Near_Trail <- TRUE
@@ -234,12 +357,18 @@ trails_and_roads_buff <- trails_and_roads_buff[, c(40:41)]
 str(trails_and_roads_buff)
 ```
 
+We can then use the `st_join` function to perform a spatial left join (keeping all the data in the first object, here "elk_combine"). This spatial left join will merge the elk data with the trails and roads buffer data and wherever the elk and buffer data spatially intersect, provide a TRUE for the "Near_Trail" variable. For all locations that do NOT intersect with the buffer, the "Near_Trail" variable will have a FALSE. We can use the `which` function to grab the rows where "Near_Trail=NA" and change the values to be FALSE instead of NA.
+
 ```{r}
 elk_combine2 <- st_join(elk_combine, trails_and_roads_buff, left=TRUE)
 
 elk_combine2[which(is.na(elk_combine2$Near_Trail)),]$Near_Trail <- FALSE
 
+str(elk_combine2)
+
 ```
+
+We can visualize this new column using the mapview functions, plotting our trails and roads object and our "used" elk locations, adding the "zcol" argument to color the points by the values in the "Near_Trail" column. 
 
 ```{r}
 mapview(trails_and_roads2)+
@@ -248,32 +377,48 @@ mapview(trails_and_roads2)+
 
 
 
-## Extract Resource (Raster) Layer to Points
+### Extract Landcover Raster Data to Locations
+
+Now that we have our "Near_Trail" covariate figured out, we can use the `extract` function to extract the landcover raster values below the elk data and add the extracted variables as a variable in our elk data.
+
+To do this, we first need to convert our elk sf object to a "Spatial" form (from the "sp" package).
 
 ```{r}
 elk_combine_sp <- as(elk_combine2, Class="Spatial")
 
 ```
 
+We can then use the `extract` function to extract the landcover data below each elk location, with the result being a vector of values equal in length to the number of elk observations we have.
+
 ```{r}
 landcover_elk <- extract(landcover_rc, elk_combine_sp)
+
+head(landcover_elk)
 ```
+
+We can now add this data as a column to our elk sf object - easy!
 
 ```{r}
 elk_combine2$Landcover <- landcover_elk
 ```
 
-## Prepare Data for Modeling
+### Convert Landcover Covariate to "TRUE/FALSE" Format
 
-0 - NA
-1 - Forest (Conifer, Deciduous, Mixed)
-2 - Regeneration
-3 - Herbaceous/Shrub
-4 - Water
-5 - Rock-Ice
-6 - Cloud
-7 - Burned (Forest, Grassland, Shrub)
-8 - Alpine (Herb, Shrub)
+We want each category in our landcover variable to be a column in our data, with each observation in our dataset having either a TRUE (if the location has this value) or FALSE (if the location does not have this value).
+
+We can use the `grepl` function in combination with the `mutate` function from the dplyr package to convert each unique value in the landcover variable into a TRUE/FALSE column.
+
+As a reminder, the different numeric values in our landcover variable correspond to the following categories:
+
+  0 - NA
+  1 - Forest (Conifer, Deciduous, Mixed)
+  2 - Regeneration
+  3 - Herbaceous/Shrub
+  4 - Water
+  5 - Rock-Ice
+  6 - Cloud
+  7 - Burned (Forest, Grassland, Shrub)
+  8 - Alpine (Herb, Shrub)
 
 ```{r}
 elk_df <- data.frame(elk_combine2)
@@ -293,7 +438,17 @@ elk_df2 <- elk_df |> dplyr::mutate(No_Data = grepl("0", Landcover),
 
 
 
-## Fit RSF 
+## Fit an RSF Model
+
+Now that we have our data all formatted, with our landcover and "near_trail" covariates, we are ready to fit our RSF!
+
+```{r}
+str(elk_df2)
+```
+
+First, let's visualize our covariates, using ggplot. We can use the `geom_bar` function to create a barplot based on the number of values in each category ("used" vs "available" and each landcover type).
+
+We can see that some of these landcover variables have a very low count for both used and available points - we may want to exclude these from the analysis.
 
 ```{r}
 library(ggplot2)
@@ -311,34 +466,79 @@ ggplot() +
   labs(x = "Landscape Class", y = "Count")
 ```
 
+```{r}
+neartrail_count <- count(elk_df2, Near_Trail, Used)
 
-### Binomial GAM
+ggplot() +
+  geom_bar(data = neartrail_count, aes(x = Near_Trail, y = n, fill = Used), position="dodge", stat="identity") +
+  theme_classic() +
+  labs(x = "Near Trail", y = "Count")
+```
+
+Our last step in formatting our data for our RSF is to convert our binary covariates and response variable to be numeric (0 for FALSE, 1 for TRUE).
+
+This is very easy with R, as using the `as.numeric` function on a variable with TRUE/FALSE data will easily convert it to 1/0 structure.
 
 ```{r}
-elk_glm <- glm(Used ~ Near_Trail + Forest + Herbaceous_Shrub + Water + Burned + Alpine, data = elk_df2, family = "binomial")
+elk_df2 <- elk_df2 |>
+  mutate(Used = as.numeric(Used),
+         Near_Trail = as.numeric(Near_Trail),
+         Forest = as.numeric(Forest),
+         Regeneration = as.numeric(Regeneration),
+         Herbaceous_Shrub = as.numeric(Herbaceous_Shrub),
+         Water = as.numeric(Water),
+         Rock_Ice = as.numeric(Rock_Ice),
+         Cloud = as.numeric(Cloud),
+         Burned = as.numeric(Burned),
+         Alpine = as.numeric(Alpine))
+
+str(elk_df2)
+```
+
+
+
+### Binomial GLM
+
+Let's create our RSF model, using the `glm` to fit a binomial generalized linear model (GLM), where our response variable is the binary variable, "Used" (TRUE for "used", FALSE for "available"), and our predictor variables or covariates are our binary choice variables for each landscape category of interest and our "Near_Trail" variable.
+
+We want to determine what covariates are significantly impacting the probability of our elk selecting to be in a particular location.
+
+We will try a couple different models with different covariates and compare them to see which model is better. 
+
+Our first model will look at the covariates for herbaceous shrub, water, burned areas, and alpine habitat, as well as whether the location was near a trail or not.
+
+```{r}
+elk_glm <- glm(Used ~ Near_Trail + Herbaceous_Shrub + Water + Burned + Alpine, data = elk_df2, family = "binomial")
 
 summary(elk_glm)
 ```
 
+For our second model, we will drop the "Near_Trail" variable and just look at the landscape categories as covariates.
+
 ```{r}
-elk_glm2 <- glm(Used ~ Near_Trail + Herbaceous_Shrub + Water + Burned + Alpine, data = elk_df2, family = "binomial")
+elk_glm2 <- glm(Used ~ Herbaceous_Shrub + Water + Burned + Alpine, data = elk_df2, family = "binomial")
 
 summary(elk_glm2)
 ```
-no difference because there are no alpine values
+
+We can compare our models using the `anova` function, which will run an analysis-of-variance test for whether the difference in model terms is significant. 
 
 ```{r}
-anova(elk_glm, elk_glm2, test="Chi")
+anova(elk_glm, elk_glm2)
 ```
 
-The AIC (Akaike information criterion) is a measure of fit that penalizes for the number of parameters
+Another method to compare models is compare their AIC (Akaike information criterion) values. AIC is a measure of model fit that penalizes for the number of parameters (or degrees of freedom, *df*) and can be extracted from fitted statistical models using a log-likelihood formula. See `?AIC` for more detials.
 
-want a lower AIC
+The "optimal" model will generally have a *lower* AIC value (this should of course be informed as well by your biological and informed opinion of what a "good" model for your system should look like).
 
 
 ```{r}
 AIC(elk_glm, elk_glm2)
 ```
+
+Based on the AIC and anova test comparison, our first model seems to be the "best".
+
+We can now extract our coefficients from our fitted model object and then use the `mutate` function to get low/high confidence intervals for each estimated coefficient.
 
 ```{r}
 model_summary <- data.frame(summary(elk_glm)$coefficients)
@@ -347,7 +547,11 @@ glm_results <- model_summary |>
           dplyr::mutate(low = Estimate - 2*Std..Error, high = Estimate + 2*Std..Error) 
 
 glm_results$variable <- row.names(glm_results)
+```
 
+We can plot our RSF results using ggplot:
+
+```{r}
 ggplot(glm_results, aes(x = Estimate, variable)) + 
   geom_errorbarh(aes(xmin = low, xmax = high)) + 
   geom_point() +
@@ -355,11 +559,57 @@ ggplot(glm_results, aes(x = Estimate, variable)) +
   ylab("Landscape Class")+
   geom_vline(xintercept = 0, linetype="dotted", 
                 color = "red", size=1.5) +
-  scale_y_discrete(labels=c("Intercept","Alpine","Burned","Forest","Herbaceous_Shrub","Near_Trail","Water"))
+  scale_y_discrete(labels=c("Intercept","Alpine","Burned","Herbaceous_Shrub","Near_Trail","Water"))
+```
+
+Importantly, we also need to create a prediction map of our RSF, showing where on the landscape our elk are selecting habitat, based on the covariates used in our chosen model. 
+
+We can do this using the "raster" package. To make a prediction map, we need to convert each of our covariates to be a binary raster, with cells having a "1" for use and a "0" for non-use.
+
+We start by creating a blank raster, defining its extent and CRS as the same as our model data, using the `extent` and `crs` functions.
+
+We also need to define the resolution of this blank raster - we can set it equal to resolution of our original raster data, using the `res` function.
+
+
+```{r}
+# create blank raster with extent/crs/res of og landscape data
+r <- raster::raster() 
+
+extent(r) <- extent(combine_sf)
+
+crs(r) <- crs(combine_sf)
+
+res(r) <- 0.015 # ~ 0.01 deg = 1 km resolution
+```
+
+The next step is to create a binary choice raster for each covariate in our model, using the `rasterize` function, our elk data, our new blank raster, and specifying the variable from our elk data to use with the "field" argument and taking the maximum value within each cell for where the variable overlaps with our blank raster.
+
+
+```{r}
+Creosote <- rasterize(prong_target2_sf, r, field="Creosote", fun="max")
+## test plot for Creosote
+#par(bg="black")
+#plot(Creosote)
+```
+
+Now we can create a raster "stack" with our variables, using the `stack` function. 
+
+This basically creates a raster sandwhich, where each layer is a variable in raster format.
+
+
+```{r}
+
+rstack_dry <- stack(Creosote, Bursage, Brittlebush, Saltbush, BluePaloVerde, DEM_10m,
+              NearWater_3000m, NearTarget_3000m)
 ```
 
 
-### Binomial GAMM
+
+
+
+
+
+### Binomial GLMM
 
 ```{r}
 library(glmmTMB)
@@ -388,6 +638,7 @@ ggplot(glmm_results, aes(x = Estimate, variable)) +
                 color = "red", size=1.5) +
   scale_y_discrete(labels=c("Intercept","Alpine","Burned","Forest","Herbaceous_Shrub","Near_Trail","Water"))
 ```
+
 
 
 
