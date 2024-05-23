@@ -239,7 +239,7 @@ ggplot(data=myelk_subset, aes(x=lon, y=lat)) +
   theme_classic()
 ```
 
-How do the speeds compare across htese phases? 
+How do the speeds compare across these phases? 
 
 ```{r}
 myelk_subset |> group_by(speedphase) |> 
