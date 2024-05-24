@@ -141,7 +141,7 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 
 ## Morning: Special Topics
 
-- Open Work Session and Special Topics by Request
+- [Extra: Points in Polys, and Intersections](Day5/IntersectingPointsAndPolygons.html)
 
 ## Afternoon: **Final Presentations**
 

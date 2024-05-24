@@ -1,0 +1,121 @@
+---
+title: 'Entry and Exit and Polygon Overlap (or the power of `st_intersection`)'
+author: "Elie Gurarie"
+subtitle: "[Brazil Move 2024 - UFMS - Campo Grande](https://eligurarie.github.io/BrazilMove2024)"
+date: "May 23, 2024"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+> # Goal:
+>  Show how to calculate when (and where) a track enters or exits a polygon and how to compute intersections of polygons. 
+
+The only package we need is:
+
+```{r}
+require(sf)
+```
+
+
+# Some simulated data
+
+A track (importantly with a "time" column): 
+
+```{r track, echo = -1}
+n <- 100
+Z.track <- (1:n) + as.numeric(arima.sim(n, model = list(ar = 0.8)))*1i
+Track <- data.frame(time = 1:length(Z.track), 
+                      x = Re(Z.track), y = Im(Z.track)) |> 
+    st_as_sf(coords = c("x","y"))
+Track
+plot(st_geometry(Track), type = "o", asp = 1)
+axis(1); axis(2)
+```
+
+A polygon: 
+
+```{r}
+getCircle <- function(center, radius){
+  z <- complex(arg = seq(0,2*pi,length=100),
+          mod = radius) + center
+  z[length(z)+1] <- z[1]
+  cbind(x = Re(z), y = Im(z)) |> 
+    list() |>
+    st_polygon() |> st_sfc()
+}
+
+Poly <- getCircle(center = 50-5i, radius = 20)
+plot(st_geometry(Track), type = "o", ylim = c(-20,10))
+plot(st_geometry(Poly), add = TRUE, border = 2, lwd = 2)
+```
+
+# When did the track enter and leave? 
+
+The key function is `st_intersection`.
+
+```{r}
+PointsInPoly <- st_intersection(Track, Poly)
+```
+
+The output is the points inside of the polygon:
+
+```{r}
+PointsInPoly
+```
+
+You can draw them: 
+
+```{r}
+plot(st_geometry(Track), type = "o", ylim = c(-20,10))
+plot(st_geometry(Poly), add = TRUE, border = 2, lwd = 2)
+plot(st_geometry(PointsInPoly), col = 3, add = TRUE, pch = 19)
+```
+
+To find the time the track is inside the polygon: 
+
+```{r}
+range(PointsInPoly$time)
+```
+
+# Polygon intersection
+
+Create two polygons: 
+
+```{r}
+Poly1 <- getCircle(-5+5i, 10) |> st_sfc()
+Poly2 <- getCircle(5-3i, 15) |> st_sfc()
+Polys <- rbind(Poly1, Poly2) |> st_sfc()  
+plot(Polys, col = scales::alpha(2:3,.2))  
+```
+
+Intersection of the polygons:
+
+```{r}
+PolyIntersection <- st_intersection(Poly1, Poly2)
+PolyIntersection
+```
+
+You can measure its area and compare to the other polygons:
+```{r}
+st_area(Polys)
+st_area(PolyIntersection)
+st_area(PolyIntersection)/st_area(Polys)
+```
+
+And you can plot it:
+
+```{r}
+plot(Polys, col = scales::alpha(2:3,.2))  
+plot(PolyIntersection, add = TRUE, lwd = 3)
+```
+  
