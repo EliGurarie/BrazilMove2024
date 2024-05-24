@@ -26,10 +26,18 @@ elk_res <- cbind(elk_res, st_coordinates(elk_res_sf))
 
 
 ## ----PickAnElk------------------------------------------------------------------
-myelk_sf <- elk_res_sf |> subset(id == "YL80")
+myelk_sf <- elk_res_sf |> subset(id == "YL80") |>
+  mutate(id = droplevels(id))
 myelk_sp <- myelk_sf |>  as_Spatial()
-myelk_kernelud <- kernelUD(myelk_sp, grid = 200)
 
+
+ggplot() + geom_sf(data =myelk_sf)
+
+?kernelUD
+
+myelk_kernelud <- kernelUD(myelk_sp,
+                           grid = 400,
+                           kern = "bivar")
 
 ## -------------------------------------------------------------------------------
 plot(myelk_kernelud)
@@ -38,6 +46,8 @@ plot(myelk_kernelud)
 ## -------------------------------------------------------------------------------
 require(raster)
 my_kernel <- raster(myelk_kernelud)
+
+
 my_kernel
 plot(my_kernel)
 
@@ -55,9 +65,16 @@ contour(my_kernel, add = TRUE)
 persp(my_kernel, border = NA, shade = TRUE)
 
 
-## ----getKDEpolygon--------------------------------------------------------------
-myelk_kde_poly <- getverticeshr(myelk_kernelud, percent = 95) |>
+require(rgl)
+surface3d(y = 1:nrow(my_kernel),
+    x = 1:ncol(my_kernel),
+    z = my_kernel*1e9)
+
+## ----gRcppGSL## ----getKDEpolygon--------------------------------------------------------------
+myelk_kde_poly <-
+  getverticeshr(myelk_kernelud, percent = 95) |>
   st_as_sf()
+
 myelk_kde_poly
 
 
@@ -66,12 +83,12 @@ st_area(myelk_kde_poly)
 
 
 ## ----mapview2, cache =FALSE-----------------------------------------------------
-mapview(myelk_kde_poly) + mapview(myelk_sf)
+mapview(myelk_kde_poly) #+ mapview(myelk_sf)
 
 
 ## ----getKernelPolyFunction------------------------------------------------------
-getKernelPoly <- function(sf, percent = 95, ...){
-  sp <- sf |> mutate(id = droplevels(id))
+getKernelPoly <- function(sf, percent = 95, idcol = "id", ...){
+  sp <- sf |> mutate(id = droplevels(get(id)))
     as_Spatial(sp[,"id"], cast = TRUE, IDs = "id") |> kernelUD(...) |>
     getverticeshr(percent = 95) |>
     st_as_sf()
@@ -79,19 +96,25 @@ getKernelPoly <- function(sf, percent = 95, ...){
 
 
 ## ----ComparingKernels-----------------------------------------------------------
-kde_poly_norm <- getKernelPoly(elk_sf |> subset(id == "YL91"), kern = "bivnorm")
-kde_poly_epa <- getKernelPoly(elk_sf |> subset(id == "YL91"), kern = "epa")
+kde_poly_norm <- getKernelPoly(elk_sf |> subset(id == "YL91"),
+                               kern = "bivnorm", grid = 400,
+                               percent = 95)
+kde_poly_epa <- getKernelPoly(elk_sf |> subset(id == "YL91"),
+                              kern = "epa", grid = 400,
+                              percent = 95)
 
 kde_compare_kernels <- rbind(
   kde_poly_norm |> mutate(type = "Bivariate Normal"),
   kde_poly_epa |> mutate(type = "Epanechnikov"))
 
-ggplot(kde_compare_kernels) + geom_sf(aes(fill = type), alpha = .5) +
+ggplot(kde_compare_kernels) +
+  geom_sf(aes(fill = type), alpha = .5) +
     geom_sf(data = elk_sf |> subset(id == "YL91"), alpha = .2, size = 1)
 
 
 ## ----computeAllMCPs-------------------------------------------------------------
-MCP_allElks <- getKernelPoly(elk_sf |> st_transform(32611), kern = "epa")
+MCP_allElks <- getKernelPoly(elk_sf |> st_transform(32611),
+                             kern = "epa", grid = 200)
 
 
 ## ----mapAllMCPs-----------------------------------------------------------------
@@ -121,6 +144,8 @@ axis(1); axis(2)
 
 
 ## -------------------------------------------------------------------------------
-threeElks_sp <- as_Spatial(elk_res_sf[,"id"], cast = TRUE, IDs = "id")
-kerneloverlap(threeElks_sp, method = "VI", kern = "epa")
+threeElks_sp <- as_Spatial(elk_res_sf[,"id"],
+                           cast = TRUE,
+                           IDs = "id")
 
+kerneloverlap(threeElks_sp, method = "VI", kern = "epa")
