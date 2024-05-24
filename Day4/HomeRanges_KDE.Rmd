@@ -138,11 +138,11 @@ mapview(myelk_kde_poly) + mapview(myelk_sf)
 We can also write a function that obtains all this information:
 
 ```{r getKernelPolyFunction}
-getKernelPoly <- function(sf, percent = 95, ...){
-  sp <- sf |> mutate(id = droplevels(id)) 
-    as_Spatial(sp[,"id"], cast = TRUE, IDs = "id") |> kernelUD(...) |>
-    getverticeshr(percent = 95) |> 
-    st_as_sf()
+getKernelPoly <- function(sf, percent = 95, idcol = "id", ...){
+  sp <- sf |> mutate(id = droplevels(get(id))) 
+  as_Spatial(sp[,"id"], cast = TRUE, IDs = "id") |> kernelUD(...) |>
+  getverticeshr(percent = 95) |> 
+  st_as_sf()
 }
 ```
 

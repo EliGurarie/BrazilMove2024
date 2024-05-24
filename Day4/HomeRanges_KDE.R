@@ -1,7 +1,3 @@
-## ----setup, include=FALSE-------------------------------------------------------
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
-                      cache = TRUE)
-
 
 ## ----cache = FALSE--------------------------------------------------------------
 library(ggplot2)
@@ -22,16 +18,16 @@ elk_res <- elk_gps |>
   subset(id %in% c("YL80", "YL91", "YL94")) |>
   mutate(id = droplevels(id))
 
-elk_res_sf <- elk_res |> 
-  st_as_sf(coords = c("lon","lat"), crs = 4326) |> 
-  st_transform(32611) 
+elk_res_sf <- elk_res |>
+  st_as_sf(coords = c("lon","lat"), crs = 4326) |>
+  st_transform(32611)
 
 elk_res <- cbind(elk_res, st_coordinates(elk_res_sf))
 
 
 ## ----PickAnElk------------------------------------------------------------------
 myelk_sf <- elk_res_sf |> subset(id == "YL80")
-myelk_sp <- myelk_sf |>  as_Spatial() 
+myelk_sp <- myelk_sf |>  as_Spatial()
 myelk_kernelud <- kernelUD(myelk_sp, grid = 200)
 
 
@@ -75,31 +71,31 @@ mapview(myelk_kde_poly) + mapview(myelk_sf)
 
 ## ----getKernelPolyFunction------------------------------------------------------
 getKernelPoly <- function(sf, percent = 95, ...){
-  sp <- sf |> mutate(id = droplevels(id)) 
+  sp <- sf |> mutate(id = droplevels(id))
     as_Spatial(sp[,"id"], cast = TRUE, IDs = "id") |> kernelUD(...) |>
-    getverticeshr(percent = 95) |> 
+    getverticeshr(percent = 95) |>
     st_as_sf()
 }
 
 
 ## ----ComparingKernels-----------------------------------------------------------
-kde_poly_norm <- getKernelPoly(elk_sf |> subset(id == "YL91"), kern = "bivnorm") 
-kde_poly_epa <- getKernelPoly(elk_sf |> subset(id == "YL91"), kern = "epa") 
+kde_poly_norm <- getKernelPoly(elk_sf |> subset(id == "YL91"), kern = "bivnorm")
+kde_poly_epa <- getKernelPoly(elk_sf |> subset(id == "YL91"), kern = "epa")
 
 kde_compare_kernels <- rbind(
   kde_poly_norm |> mutate(type = "Bivariate Normal"),
   kde_poly_epa |> mutate(type = "Epanechnikov"))
 
-ggplot(kde_compare_kernels) + geom_sf(aes(fill = type), alpha = .5) + 
+ggplot(kde_compare_kernels) + geom_sf(aes(fill = type), alpha = .5) +
     geom_sf(data = elk_sf |> subset(id == "YL91"), alpha = .2, size = 1)
 
 
 ## ----computeAllMCPs-------------------------------------------------------------
-MCP_allElks <- getKernelPoly(elk_sf |> st_transform(32611), kern = "epa") 
+MCP_allElks <- getKernelPoly(elk_sf |> st_transform(32611), kern = "epa")
 
 
 ## ----mapAllMCPs-----------------------------------------------------------------
-ggplot(MCP_allElks) + 
+ggplot(MCP_allElks) +
   geom_sf(aes(fill = id, color = id), alpha = .2)
 
 
@@ -117,8 +113,8 @@ kernel2 <- elk2 |>  as_Spatial() |>  kernelUD(grid = 200)
 
 
 ## ----Countour2Kernels-----------------------------------------------------------
-contour(kernel1, 
-        xlim = c(590e3, 610e3), ylim = c(5720e3, 5745e3), 
+contour(kernel1,
+        xlim = c(590e3, 610e3), ylim = c(5720e3, 5745e3),
         col = "blue")
  contour(kernel2, add = TRUE, col = "red")
 axis(1); axis(2)
