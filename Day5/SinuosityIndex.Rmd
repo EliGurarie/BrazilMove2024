@@ -12,47 +12,153 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
-                      cache = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, 
+                      warning = FALSE, cache = TRUE)
 ```
 
 # Goal
 
-> To estimate the sinuousity index
+> To estimate the sinuousity index of Benhamou and Bovet:
+$$SI = 2 \left( {p(1-c^2-s^2) \over (1-c)^2 + s^2} + b^2 \right)^{-1/2}$$ 
+> where: 
+> - $SI$ = Sinuosity
+> - $p$ = mean step length
+> - $c$ = mean cos of turning angles
+> - $s$ = mean sin of turning angles
+> - $b$ = coefficient of variation of turning angles
 
 Packages:
 
 ```{r, cache = FALSE}
-library(ggplot2)
 library(plyr)
 library(sf)
-library(adehabitatHR)
-library(mapview)
 ```
 
 
-# Selecting some animals
+# Load some elk data
 
-```{r loadData, echo = -1}
+
+```{r, echo = -1}
 setwd("../")
 load("./data/elk_processed.rda")
-head(elk_gps)
 ```
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Pick a good animal with lots of variation, and just obtain the XY coordinates 
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+elk_XY <- elk_sf |> subset(id %in% "YL96") |> st_transform(32611) |> st_coordinates()
 ```
 
-## Including Plots
+Note - XY is a matrix
+We'll use the old scan track - without time, just indexing the track:
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+layout(cbind(c(1,1),2:3));  par(bty = "l", mar = c(2,2,2,2))
+plot(elk_XY, type ="l", asp = 1)
+plot(elk_XY[,"X"], type = "l")
+plot(elk_XY[,"Y"], type = "l")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Let's subset the track to portion that contains mainly tortuous movements:
+
+```{r}
+elk_subset <- elk_XY[1:400,]
+layout(cbind(c(1,1),2:3));  par(bty = "l", mar = c(2,2,2,2))
+plot(elk_subset, type ="l", asp = 1)
+plot(elk_subset[,"X"], type = "l")
+plot(elk_subset[,"Y"], type = "l")
+```
+ 
+ 
+# Gather metrics
+ 
+Now we just need to obtain all of the metrics needed for the index.  Easiest as always to do a pipe on a dataframe: 
+
+```{r}
+ Z = elk_subset[,1] + 1i*elk_subset[,2]
+  Step = diff(Z)
+  L = Mod(Step)
+  Phi = Arg(Step)
+  Theta = diff(Phi)
+```
+
+Recall:
+
+> - $p$ = mean step length
+> - $c$ = mean cos of turning angles
+> - $s$ = mean sin of turning angles
+> - $b$ = coefficient of variation of turning angles
+
+Now we put this together: 
+
+```{r}
+p <- mean(elk_df$L, na.rm = TRUE)
+c <- mean(cos(elk_df$Theta), na.rm = TRUE)
+s <- mean(sin(elk_df$Theta), na.rm = TRUE)
+b <- sd(elk_df$Theta, na.rm = TRUE) / mean(elk_df$Theta, na.rm = TRUE)
+```
+
+And the index itself is:
+
+```{r}
+SI <- 2 *  (p * (1 - c^2 - s^2) / ((1-c)^2 + s^2) + b^2)^(-1/2)
+SI
+```
+
+# Write a function
+
+Let's write a function that does all of these things: 
+
+
+```{r}
+computeSI <- function(XY){
+  Z = XY[,"X"] + 1i*XY[,"Y"]
+  Step = diff(Z)
+  L = Mod(Step)
+  Phi = Arg(Step)
+  Theta = diff(Phi) # turning angle
+  p <- mean(L)
+  c <- mean(cos(Theta))
+  s <- mean(sin(Theta))
+  b <- sd(Theta) / mean(Theta)
+  2 *  (p * (1 - c^2 - s^2) / ((1-c)^2 + s^2) + b^2)^(-1/2)
+}
+```
+
+
+```{r}
+computeSI(elk_subset)
+```
+
+Compare to another piece of track:
+
+```{r}
+elk_subset2 <- elk_XY[470:500,]
+layout(cbind(c(1,1),2:3));  par(bty = "l", mar = c(2,2,2,2))
+plot(elk_subset2, type ="o", asp = 1)
+plot(elk_subset2[,"X"], type = "l")
+plot(elk_subset2[,"Y"], type = "l")
+```
+ 
+```{r}
+computeSI(elk_subset2)
+```
+ 
+ 
+# Obtain the SI index by month
+
+```{r}
+myelk <- elk_sf |> subset(id %in% "YL96") |> st_transform(32611)
+
+# add a month covariate, and the spatial coordinates
+myelk <- myelk |> 
+  mutate(Week = lubridate::week(datetime)) |> 
+  data.frame(st_coordinates(myelk))
+
+# apply the SI function by month:
+
+require(dplyr)
+SI_by_week <- ddply(myelk, "Week", computeSI)
+plot(SI_by_week, type = "l")
+```
+

@@ -63,7 +63,7 @@ The course will mix lectures on concepts, theory and tools with practical labs u
 The outline of the course below is approximate.  We'll be posting links to materials (lecture and labs) as the course proceeds.  
 
 
-# Day 1: Monday, May 20
+  # Day 1: Monday, May 20
 
 ## Overview
 
@@ -152,5 +152,5 @@ Please come prepared to present (~10 min) on a small analysis of your data (Incl
 </font>
  
 <center>
-<img src="https://eligurarie.github.io/MovementEcologyBook/images/Muybridge_Buffalo_galloping.gif" width ="300">
+![](images/todos.jpg)
 </center>
