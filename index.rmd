@@ -124,7 +124,9 @@ See also these chapters  on [Discrete](https://eligurarie.github.io/MovementEcol
 - [Lab - Mininum convex polygon](Day4/HomeRanges_MCP.html) ([R lab](Day4/HomeRanges_MCP.R))
 - [Lab - Kernel density estimates](Day4/HomeRanges_KDE.html) ([R lab](Day4/HomeRanges_KDE.R))
 
-- [**Extra Lecture** - Continouous Time Movement Models and akde](ExtraLectures/ContinuousMovementModels_PortoJofre.html)
+- [**Extra Lecture** - Continouous Time Movement Models and akde](ExtraLectures/ContinuousMovementModels_PortoJofre.html) (*same as lecture in section 6 above*)
+
+- [**Extra-extra Lecture** - Fast alternative to `akde`](ExtraLectures/AltKDE_presentation.html)
 
 <!--
 ## Morning: **Resource Selection**
