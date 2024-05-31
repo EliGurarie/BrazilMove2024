@@ -68,8 +68,7 @@ Links to all the materials (lecture and labs) in the course are posted below.
 - [Slides](Day1/01_Overview/Overview.html)
 
 <font color = "darkred"> 
-**Present:** *about yourself*
-Please come prepared with 2-3 slides to introduce yourself, your study system, your ecological questions, and a brief description of your data. 
+**Presentations:**  Please come prepared with 2-3 slides to introduce yourself, your study system, your ecological questions, and a brief description of your data. 
 </font>
 
 ## 2. Processing Movement Data
@@ -86,6 +85,11 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 - [**R** Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html) ([code](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.R))
 
 
+<font color = "darkred"> 
+**Exercise:** *Download, process and visualize your movement data.*
+</font>
+
+
 ## 4. Complex Numbers (are simple)
 
 - [Lecture/Lab](Day2/04_ComplexNumbers/ComplexNumbers.html)
@@ -96,7 +100,7 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 - [Lecture/Lab](Day2/05_StatisticalSummaries/Lab_StatisticalSummaries.html)
 
 <font color = "darkred"> 
-**Exercise:** *Generate a summary table and relevant visualizations for your data.*
+**Exercise:** *Generate a summary table - with an emphasis on sampling intervals, total duration, and some step length and turning angle statistics from your data.*
 </font>
 
 ## 6. Movement Models
