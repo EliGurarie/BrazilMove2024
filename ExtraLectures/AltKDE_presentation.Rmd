@@ -1,0 +1,331 @@
+---
+title: "**alt-kde**: a simple/fast alternative to `akde`" 
+author: "**Elie Gurarie**"
+output: 
+  xaringan::moon_reader:
+    css: [default, default-fonts, mycss.css]
+    nature:
+      highlightStyle: github
+      countIncrementalSlides: false
+      highlightLines: true
+      titleSlideClass: ["left"]
+      ratio: '16:9'
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, 
+                      dpi = 200)
+```
+
+```{r}
+pcks <- c("plyr", "lubridate", "adehabitatHR", "smoove", "sf", "raster")
+a <- sapply(pcks, require, character = TRUE)
+scan_track <- function(dataframe, x = "lon", y = "lat",
+                             time = "datetime", id = "id", ...){
+
+  par(mar = c(0,4,0,0), oma = c(4,0,5,2), xpd=NA)
+  X <- dataframe[,x]
+  Y <- dataframe[,y]
+  Time <- dataframe[,time]
+  ID <- dataframe[1,id]
+  
+  layout(rbind(c(1,2), c(1,3)))
+  plot(X, Y, asp = 1, type="o", ylab=y, xlab=x, ...)
+  plot(Time, X, type="o", xaxt="n", ylab=y, xlab="", ...)
+  plot(Time, Y, type="o", ylab=y, xlab=time, ...)
+  title(ID, outer = TRUE)
+}
+```
+
+
+.pull-left-60[
+### `akde`
+
+- strength is: 
+  - taking account of autocorrelation in position and velocity, 
+  - estimating time scales of **home ranging** and (sometimes) **speeds**
+  - providing confidence intervals
+
+- disadvantage 
+  - VERY SLOW, 
+  - VERY FUSSY, 
+  - hard to use DATA STRUCTURE
+  - complicated math
+
+]
+
+.pull-right-40[
+> ### `alt-kde`
+> 
+> CAN (eventually) estimate everything `akde` does in 1/100th the time. 
+
+]
+
+
+- critique
+  - You **never need to take account of velocity autocorrelation** if you are interested in something on the scale of the **home range**  ... OUF is almost always the "selected model", but it is never a necessary model
+
+
+
+
+---
+
+## Introducing Henriquets
+
+Giant anteater *Myrmecophaga tridactyla* as an example.  Note: **20 minutes** locations. 
+
+```{r loadMyrm}
+#load("data/movedata.Rdata")
+#henriqueta <- movedata |> subset(ID == "henriqueta") |> 
+#  mutate(timestamp = ymd_hms(date)) 
+#save(henriqueta, file = "data/henriqueta.rda")
+# fix <- which(is.na(henriqueta$timestamp))
+# henriqueta$timestamp[fix] <- ymd_hms(paste(henriqueta$date[fix], "00:00:00"))
+# henriqueta <- henriqueta |> arrange(timestamp)
+load("data/henriqueta.rda")
+```
+
+
+```{r henriqueta_scantrack, fig.width = 10, fig.height = 5,cache = TRUE}
+elieslides::pars()
+scan_track(henriqueta, 
+           x = "x", y = "y", time = "timestamp", id = "ID", col = rgb(0,0,0,.2), 
+           cex = 0.5, pch = 19)
+```
+
+
+---
+
+## Is this movement an "OUF"!?
+
+```{r henriqueta_scantrack_zoom, fig.width = 10, fig.height = 5}
+elieslides::pars()
+scan_track(henriqueta[1:400,] |> mutate(ID = "henriqueta - first week"), 
+           x = "x", y = "y", time = "timestamp", id = "ID", col = rgb(0,0,0,.2), pch = 19)
+```
+
+---
+
+## Step 1: estimate SPACE autocorrelation 
+
+- Autocorrelation value: **0.9913**;  equivalent to time-scale: **115** "steps" = **1.6** days 
+
+This is an estimate of the **Time Scale** of crossing / using the home range: $\tau_p$ 
+
+
+```{r, fig.width = 10, fig.height = 4}
+elieslides::pars(); par(mfrow = c(1,2), oma = c(0,0,2,0), xpd=NA)
+X <- henriqueta$x
+Y <- henriqueta$y
+Time <- henriqueta$timestamp
+dTime <- as.numeric(difftime(Time[-1], Time[-length(Time)], units = "hours"))
+acf(X, lag.max = 200)
+acf(Y, lag.max = 200)
+
+diff(Time) |> summary()
+
+X.ar <- arima(X, order = c(1,0,0))$coef["ar1"]
+Y.ar <- arima(Y, order = c(1,0,0))$coef["ar1"]
+
+AR <- mean(X.ar, Y.ar)
+lag.ind <- (-1/log(AR)) |> round()
+```
+
+---
+
+## Step 2:  Compute standard **kernel density estimates** 
+
+.pull-left-30[
+
+Many times!   E.g., if lag is 100: 
+
+- Lag1: 1, 101, 201, 301 ...
+- Lag2: 2, 102, 202, 302 ...
+- Lag3: 3, 103, 203, 303 ...
+
+So 100 differnet home ranges
+]
+
+.pull-right-50[
+
+```{r}
+getKernelPoly <- function(sf, percent = 95, idcol = "id", unout = "ha", ...){
+  sp <- sf |> mutate(id = droplevels(factor(get(idcol))))
+  sp.kern <- as_Spatial(sp[,"id"], cast = TRUE, IDs = "id") |> kernelUD(...) 
+  getverticeshr(sp.kern, percent = 95, unout = unout) |> 
+  st_as_sf()
+}
+```
+
+```{r fitAltKDEs, cache = TRUE}
+require(adehabitatHR)
+
+henriqueta <- henriqueta |>  
+  mutate(lag = paste0("L", (1:nrow(henriqueta)) %% lag.ind)) |> 
+  st_as_sf(coords = c("x","y"))
+
+henriqueta_polys <- getKernelPoly(henriqueta, idcol = "lag", grid = 200,
+                                   kern = "epa", unout = "km2")
+```
+
+```{r}
+plot(henriqueta_polys[,"id"], border = NA, col = scales::alpha(rainbow(115), .05))
+```
+]
+
+
+
+---
+
+## Step 3: Summarize Those Polygons
+
+.pull-left-30[
+
+```{r}
+(h.alt_akde <- henriqueta_polys$area |> quantile(c(0.025, 0.5, 0.975)))
+```
+]
+
+.pull-right-50[
+
+```{r}
+plot(henriqueta_polys[,"id"], border = NA, col = scales::alpha(rainbow(115), .05))
+```
+
+]
+
+
+---
+
+.pull-left-40[
+
+## Step 4: Average all those densities into a single raster
+
+```{r computeAltKDEkernels, eval = FALSE}
+getKernelRaster <- function(sf, percent = 95, idcol = "id", unout = "ha", ...){
+  sp <- sf |> mutate(id = droplevels(factor(get(idcol))))
+  sp_kern <- as_Spatial(sp[,"id"], cast = TRUE, IDs = "id") |>
+    kernelUD(..., same4all = TRUE) 
+  lapply(sp_kern, raster) |> brick()
+}
+
+require(raster)
+h.kerns <- getKernelRaster(henriqueta, idcol = "lag", grid = 200, 
+                           kern = "epa")
+h.kern_overall <- stackApply(h.kerns, 3, "sum") / length(h.kerns) 
+h.kern_overall <- crop(h.kern_overall, extent(624.5e3, 632e3,786e4, 7868e3))
+plot(h.kern_overall)
+writeRaster(h.kern_overall, "data/henriqueta_kernel_pooled", 
+            overwrite = TRUE)
+``` 
+]
+
+.pull-right-60[
+
+```{r plotRaster1, fig.height = 6, fig.width = 6}
+h.kern_overall <- raster("data/henriqueta_kernel_pooled.grd")
+cdf <- getValues(cumsum(h.kern_overall[[1]]))
+threshold <- h.kern_overall[which.min(abs(cdf/max(cdf) - 0.05))] |> as.numeric()
+raster::plot(h.kern_overall, main = "alt-kde")
+points(st_coordinates(henriqueta), col = 2, cex = 0.1, pch = 19)
+contour(h.kern_overall, levels = c(0,threshold, 1), add = TRUE, 
+        labels = "95%")
+```
+]
+
+
+---
+
+## Step 5: Comparison
+
+
+
+```{r fitOUF, eval = FALSE}
+require(ctmm)
+h.tm <- as.telemetry(henriqueta)
+h.guess <- ctmm.guess(h.tm, interactive = FALSE)
+```
+
+```{r h.fit, eval = FALSE}
+require(ctmm)
+h.fit<-ctmm.select(h.tm,CTMM=h.guess,verbose=TRUE,trace=TRUE)
+save(h.tm, h.fit, file = "h_ouf.rda")
+summary(h.fit)
+```
+
+
+
+
+
+.pull-left[
+
+### akde
+
+```{r h.akde, cache = TRUE}
+require(ctmm)
+load("data/h_ouf.rda")
+# h.fit[[1]] |> summary()
+h.akde <- akde(h.tm,CTMM=h.fit[[1]]) 
+
+summary(h.akde)$CI |> round(3)
+```
+
+### alt-kde
+
+```{r}
+(h.alt_akde <- henriqueta_polys$area |> quantile(c(0.025, 0.5, 0.975)))
+```
+
+
+
+
+] 
+
+.pull-right[
+```{r compareEstimates, fig.width = 3, fig.height = 3}
+require(ggplot2)
+ests <- data.frame(akde.km2 = summary(h.akde)$CI[1,],
+           alt_akde.km2 = h.alt_akde)
+ests |> t() |> 
+  data.frame() |> mutate(type = c("akde", "alt_akde")) |>
+ggplot(aes(type, est, ymin = low, ymax = high)) + 
+  geom_point() + geom_errorbar() + ylim(c(0,12))
+```
+]
+
+---
+
+## Compare Rasters
+
+```{r compareRasters, cache = FALSE, fig.width = 10, fig.height=5}
+require(raster); require(sf)
+par(mfrow = c(1,2))
+plot(h.tm, UD = h.akde, main = "akde")
+
+# load and print alt_kde kernels
+cdf <- getValues(cumsum(h.kern_overall[[1]]))
+threshold <- h.kern_overall[which.min(abs(cdf/max(cdf) - 0.05))] |> as.numeric()
+raster::plot(h.kern_overall, main = "alt-kde")
+points(st_coordinates(henriqueta), col = 2, cex = 0.1, pch = 19)
+contour(h.kern_overall, levels = c(0,threshold, 1), add = TRUE, 
+        labels = "95%")
+```
+
+
+---
+
+## Probably ...
+
+> There will be **no important differences** between `akde` and `alt-kde` estimates. 
+
+
+
+Still to do:  
+
+- Make estimates "robust" to irregular sampling (relatively easy with `smoove` and `bcpa` packages).
+
+- Obtain confidence intervals around $\tau_p$ and mean speed $\nu$. 
+
+- Compare estimates of all parameters against `akde` estimates other animals

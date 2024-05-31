@@ -31,7 +31,7 @@ Department of Environmental Biology <br>
 State University of New York, College of Environmental Science and Forestry (SUNY-ESF) <br>
 Syracuse, NY 13210, USA
 
-*With able assistance of:*<br> **Dr. Luiz Gustavo Rodrigues Oliveira-Santos** (UFMGS) and   **Dr. James Forester** (University of Minnesota)
+*With assistance of:*<br>  **[Dr. Gustavo Oliveira-Santos](https://ensino.ufms.br/docentes?page=44)** and **[Dr. Aline Giroux](https://www.researchgate.net/profile/Aline-Giroux)** (UFMGS)<br> and **[Dr. James Forester](https://fwcb.cfans.umn.edu/people/james-forester)** (University of Minnesota)
 
 </center>
 
@@ -49,23 +49,21 @@ This is a **hands-on** course, where every day students will be expected to perf
 
 If you don't have data that feels relevant, you can work with other participants on an in-class project.
 
-We will be using [R](https://cran.r-project.org/), which we assume *participants have experience using*.  Be sure **R** is installed, as well as (most likely) [Rstudio](https://posit.co/download/rstudio-desktop/), preferably recent versions.  
+We will be using [R](https://cran.r-project.org/), which we assume *participants have experience using*.  Be sure **R** is installed, as well as (most likely) [Rstudio](https://posit.co/download/rstudio-desktop/), preferably recent versions of both.  
 
-We'll also use a bunch of useful packages which we can install and load as needed.  
+We will also use a bunch of useful packages which we can install and load as needed.  
 
 Bring enthusiasm! 
 
-
-## Structure
+# Course Materials
 
 The course will mix lectures on concepts, theory and tools with practical labs using R. We will plan on covering roughly 2 topics per day in a morning (**8:00-11:30 am**) and afternoon (**1:30-5:00 pm**) session, with a mix of lecture and R labs for each.  We will also set aside time every day for participants to apply some of the techniques to their own data (alone or in groups) in a workshop-type atmosphere.  We will culminate with some brief presentations of some of the analysis performed by individuals / groups.  
 
-The outline of the course below is approximate.  We'll be posting links to materials (lecture and labs) as the course proceeds.  
+Links to all the materials (lecture and labs) in the course are posted below. 
 
+<!-- # Day 1: Monday, May 20 -->
 
-  # Day 1: Monday, May 20
-
-## Overview
+## 1. Overview
 
 - [Slides](Day1/01_Overview/Overview.html)
 
@@ -74,39 +72,42 @@ The outline of the course below is approximate.  We'll be posting links to mater
 Please come prepared with 2-3 slides to introduce yourself, your study system, your ecological questions, and a brief description of your data. 
 </font>
 
-## Topic: Processing Movement Data
+## 2. Processing Movement Data
 
 - [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
 
 - [**R** Lab](Day1/02_ProcessingData/Lab1_DataProcessing.html) ([code](Day1/02_ProcessingData/Lab1_DataProcessing.R))
-  - data here: [Elk_GPS_data.csv](data/Elk_GPS_data.csv) (right-click to download)
+  - data here: [Elk_GPS_data.csv](data/Elk_GPS_data.csv) (right-click to download), also available on Movebank [here](https://www.movebank.org/cms/webapp?gwt_fragment=page=studies,path=study897981076).  (With a huge acknowledgement to [Dr. Mark Hebblewhite](https://www.umt.edu/ungulate-ecology-lab/) and the enormous amount of work and research that went into the Ya Ha Tinda). 
   
 **Guest Lecture from [Sarah Davidson](https://www.ab.mpg.de/person/98230/2736)** - from [Movebank](https://www.movebank.org/cms/movebank-main) 
 
-## Topic: Visualizing Movement Data
+## 3. Visualizing Movement Data
 
 - [**R** Lab](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.html) ([code](Day1/03_SummariesVisualization/Lab02_SomeVisualizations.R))
 
 
-# Day 2: Tuesday, May 21
-
-## Topic: Complex Numbers (are simple)
+## 4. Complex Numbers (are simple)
 
 - [Lecture/Lab](Day2/04_ComplexNumbers/ComplexNumbers.html)
 - See also book chapter [here](https://eligurarie.github.io/MovementEcologyBook/part2_data_and_manipulations/complex_numbers.html).  
 
-## Topic: Statistical Summaries
+## 5. Statistical Summaries
 
 - [Lecture/Lab](Day2/05_StatisticalSummaries/Lab_StatisticalSummaries.html)
 
-# Day 3: Wednesday, May 22
+<font color = "darkred"> 
+**Exercise:** *Generate a summary table and relevant visualizations for your data.*
+</font>
 
-## Topic: Movement Models
+## 6. Movement Models
+
+See also these chapters  on [Discrete](https://eligurarie.github.io/MovementEcologyBook/part4_movement_models/discrete_movement_models.html) and [Continuous](https://eligurarie.github.io/MovementEcologyBook/part4_movement_models/continuous_movement_models.html) movement models. 
 
 - [Lecture: Discrete Movement Models](Day3/06_MovementModels/DiscreteMovementModels.html)
+- [**Extra Lecture** - Continouous Time Movement Models](ExtraLectures/ContinuousMovementModels_PortoJofre.html)
 
 
-## Topic: Segmentation
+## 7. Segmentation
 
 - [Lecture](Day3/Segmentation/Segmentation.html)
 - [Lab - Lavielle Segmentation](Day3/Segmentation/Lab_LavielleSegmentation.html) ([R code](Day3/Segmentation/Lab_LavielleSegmentation.R))
@@ -117,13 +118,13 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 **Exercise:** *Apply a movement model or segmentation method to your data.*
 </font>
 
-# Day 4: Thursday, May 23
+## 8. Home Range Analyses
 
-## Topic:  **Home Range Analyses**
-
+- [Lecture - Overview](Day4/HomerangeI.pdf) 
 - [Lab - Mininum convex polygon](Day4/HomeRanges_MCP.html) ([R lab](Day4/HomeRanges_MCP.R))
 - [Lab - Kernel density estimates](Day4/HomeRanges_KDE.html) ([R lab](Day4/HomeRanges_KDE.R))
-- Auto-correlated kernel density estimates
+
+- [**Extra Lecture** - Continouous Time Movement Models and akde](ExtraLectures/ContinuousMovementModels_PortoJofre.html)
 
 <!--
 ## Morning: **Resource Selection**
@@ -137,13 +138,11 @@ Please come prepared with 2-3 slides to introduce yourself, your study system, y
 -->
 
 
-# Day 5: Friday, May 24
-
-## Morning: Special Topics
+## 9. Special Topics
 
 - [Extra: Points in Polys, and Intersections](Day5/IntersectingPointsAndPolygons.html)
 
-## Afternoon: **Final Presentations**
+## **Final Presentations**
 
 <font color = "darkred">
 
@@ -152,5 +151,5 @@ Please come prepared to present (~10 min) on a small analysis of your data (Incl
 </font>
  
 <center>
-![](images/todos.jpg)
+![BrazilMove2024 participants - UFMS Campo Grande](images/todos.jpg)
 </center>
