@@ -76,7 +76,7 @@ Links to all the materials (lecture and labs) in the course are posted below.
 - [Lecture Slides](Day1/02_ProcessingData/PreliminaryProcessing.html)
 
 - [**R** Lab](Day1/02_ProcessingData/Lab1_DataProcessing.html) ([code](Day1/02_ProcessingData/Lab1_DataProcessing.R))
-  - data here: [Elk_GPS_data.csv](data/Elk_GPS_data.csv) (right-click to download), also available on Movebank [here](https://www.movebank.org/cms/webapp?gwt_fragment=page=studies,path=study897981076).  (With a huge acknowledgement to [Dr. Mark Hebblewhite](https://www.umt.edu/ungulate-ecology-lab/) and the enormous amount of work and research that went into the Ya Ha Tinda). 
+  - data here: [Elk_GPS_data.csv](data/Elk_GPS_data.csv) (right-click to download), also available on Movebank [here](https://www.movebank.org/cms/webapp?gwt_fragment=page=studies,path=study897981076).  With a huge **thank you** to [Dr. Mark Hebblewhite](https://www.umt.edu/ungulate-ecology-lab/) and the enormous amount of work and research that went into the [Ya Ha Tinda long-term monitoring project](https://www.umt.edu/yahatinda/)). 
   
 **Guest Lecture from [Sarah Davidson](https://www.ab.mpg.de/person/98230/2736)** - from [Movebank](https://www.movebank.org/cms/movebank-main) 
 
@@ -105,7 +105,7 @@ Links to all the materials (lecture and labs) in the course are posted below.
 
 ## 6. Movement Models
 
-See also these chapters  on [Discrete](https://eligurarie.github.io/MovementEcologyBook/part4_movement_models/discrete_movement_models.html) and [Continuous](https://eligurarie.github.io/MovementEcologyBook/part4_movement_models/continuous_movement_models.html) movement models. 
+See also these [**book chapters**](https://eligurarie.github.io/MovementEcologyBook) on [Discrete](https://eligurarie.github.io/MovementEcologyBook/part4_movement_models/discrete_movement_models.html) and [Continuous](https://eligurarie.github.io/MovementEcologyBook/part4_movement_models/continuous_movement_models.html) movement models. 
 
 - [Lecture: Discrete Movement Models](Day3/06_MovementModels/DiscreteMovementModels.html)
 - [**Extra Lecture** - Continouous Time Movement Models](ExtraLectures/ContinuousMovementModels_PortoJofre.html)
@@ -127,9 +127,7 @@ See also these chapters  on [Discrete](https://eligurarie.github.io/MovementEcol
 - [Lecture - Overview](Day4/HomerangeI.pdf) 
 - [Lab - Mininum convex polygon](Day4/HomeRanges_MCP.html) ([R lab](Day4/HomeRanges_MCP.R))
 - [Lab - Kernel density estimates](Day4/HomeRanges_KDE.html) ([R lab](Day4/HomeRanges_KDE.R))
-
 - [**Extra Lecture** - Continouous Time Movement Models and akde](ExtraLectures/ContinuousMovementModels_PortoJofre.html) (*same as lecture in section 6 above*)
-
 - [**Extra-extra Lecture** - Fast alternative to `akde`](ExtraLectures/AltKDE_presentation.html)
 
 <!--
@@ -157,5 +155,5 @@ Please come prepared to present (~10 min) on a small analysis of your data (Incl
 </font>
  
 <center>
-![BrazilMove2024 participants - UFMS Campo Grande](images/todos.jpg)
+![BrazilMove2024 participants - UFMS Campo Grande](images/todos_cropped.jpg)
 </center>
